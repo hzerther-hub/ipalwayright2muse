@@ -163,6 +163,10 @@ label.sw{display:inline-flex;align-items:center;gap:7px;color:var(--muted);font-
       <button data-view="service"><span class="dot"></span>服务控制</button>
     </nav>
     <div class="side-foot">
+      <label class="sw" style="display:block;margin-bottom:8px">
+        <span style="color:var(--muted);font-size:11px">上游</span>
+        <select id="upstreamSelect" style="margin-top:5px;width:100%"></select>
+      </label>
       Muse 可用地区<br><code id="regions">US / CA / JP / SG / MX / AU</code><br>
       面板 <code>127.0.0.1:18611</code>
     </div>
@@ -238,6 +242,10 @@ label.sw{display:inline-flex;align-items:center;gap:7px;color:var(--muted);font-
         <h3>muse2api 账号池</h3>
         <div id="loginPoolBody"></div>
       </div>
+      <div class="card" id="inviteCard" style="display:none">
+        <h3>邀请额度</h3>
+        <div id="inviteBody"><span class="spin"></span> 正在读取…</div>
+      </div>
     </section>
 
     <!-- ============ 选点目录 ============ -->
@@ -306,8 +314,51 @@ const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g,
   c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+/* ---------- 上游选择 ---------- */
+let CURRENT_UPSTREAM = localStorage.getItem('panel_upstream') || 'muse2api';
+
+async function loadUpstreams() {
+  const sel = $('#upstreamSelect');
+  if (!sel) return;
+  try {
+    const d = await api('/api/upstreams');
+    sel.innerHTML = '';
+    (d.upstreams || []).forEach(id => {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = id;
+      if (id === CURRENT_UPSTREAM) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    if (!(d.upstreams || []).includes(CURRENT_UPSTREAM)) {
+      CURRENT_UPSTREAM = (d.upstreams || [])[0] || CURRENT_UPSTREAM;
+      sel.value = CURRENT_UPSTREAM;
+    }
+    sel.onchange = () => {
+      CURRENT_UPSTREAM = sel.value;
+      localStorage.setItem('panel_upstream', CURRENT_UPSTREAM);
+      refreshCurrentView();
+    };
+  } catch (e) {
+    sel.innerHTML = '<option value="' + esc(CURRENT_UPSTREAM) + '">'
+      + esc(CURRENT_UPSTREAM) + '</option>';
+  }
+}
+
+function refreshCurrentView() {
+  const active = document.querySelector('#nav button.active');
+  const view = active ? active.dataset.view : 'exit';
+  const loaders = { exit: loadExit, guarantee: loadGuarantee, login: refreshLogin,
+                    catalog: loadCatalog, hop: loadHop, service: loadServices };
+  (loaders[view] || loadExit)();
+}
+
 async function api(path, opts) {
-  const res = await fetch(path, opts);
+  // Every request carries the selected upstream so the panel knows which
+  // registered service to talk to.
+  const sep = path.includes('?') ? '&' : '?';
+  const url = path + sep + 'upstream=' + encodeURIComponent(CURRENT_UPSTREAM);
+  const res = await fetch(url, opts);
   const text = await res.text();
   let data;
   try { data = JSON.parse(text); } catch (e) { throw new Error('响应不是 JSON: ' + text.slice(0, 160)); }
@@ -702,7 +753,65 @@ async function refreshLogin() {
 
     const pool = await api('/api/login/pool');
     poolCard.style.display = '';
-    poolCard.innerHTML = '<h3>muse2api 账号池</h3>' + poolHtml(pool.accounts);
+    poolCard.innerHTML = '<h3>' + esc(CURRENT_UPSTREAM) + ' 账号池</h3>' + poolHtml(pool.accounts);
+
+    // ---- 邀请额度 ----
+    const inviteCard = $('#inviteCard');
+    const inviteBody = $('#inviteBody');
+    try {
+      const inv = await api('/api/invite');
+      if (!inv || inv.ok !== true) {
+        inviteCard.style.display = 'none';
+      } else {
+        inviteCard.style.display = '';
+        const yn = (v) => v ? '<span class="pill yes">✓</span>'
+          : '<span class="pill no">✗</span>';
+        const per = inv.credits_per_use_billion || 0;
+        let html = '<dl class="kv">' +
+          '<dt>邀请码</dt><dd class="mono">' + esc(inv.invite_code || '—') + '</dd>' +
+          '<dt>还可使用</dt><dd>' + esc(inv.remaining_uses == null ? '—'
+            : inv.remaining_uses) + ' 次</dd>' +
+          '<dt>每次获得</dt><dd>' + (per ? esc(per) + ' 亿词元（双方各得）' : '—') + '</dd>' +
+          '<dt>兑现窗口</dt><dd>' + (inv.redeem_window_hours
+            ? esc(inv.redeem_window_hours) + ' 小时内' : '—') + '</dd>' +
+          '<dt>理论上限</dt><dd>' + (inv.max_total_billion
+            ? esc(inv.max_total_billion) + ' 亿词元' : '—') + '</dd>' +
+          '</dl>';
+        html += '<div class="row" style="flex-wrap:wrap;margin-top:12px">' +
+          '<button class="btn" id="inviteCopy">复制邀请码</button>' +
+          '<button class="btn" id="inviteCopyMsg">复制推荐内容</button>' +
+          '<button class="btn" id="inviteRefresh">重新读取</button>' +
+          '<span id="inviteMsg" style="color:var(--muted);font-size:12px"></span>' +
+          '</div>';
+        if (inv.referral_link) {
+          html += '<pre class="mono" style="margin-top:12px;white-space:pre-wrap;' +
+            'font-size:12px;color:var(--muted)">' + esc(inv.referral_link) + '</pre>';
+        }
+        html += '<div class="note">额外额度「从不过期」，靠邀请码攒。' +
+          '好友需在加入后 ' + (inv.redeem_window_hours || 48) +
+          ' 小时内去「设置 → 使用情况 → 兑现邀请码」，否则作废。</div>';
+        inviteBody.innerHTML = html;
+        $('#inviteCopy').onclick = async () => {
+          try {
+            await navigator.clipboard.writeText(inv.invite_code || '');
+            $('#inviteMsg').textContent = '已复制邀请码';
+          } catch (e) { $('#inviteMsg').textContent = '复制失败'; }
+        };
+        $('#inviteCopyMsg').onclick = async () => {
+          try {
+            await navigator.clipboard.writeText(inv.referral_link || '');
+            $('#inviteMsg').textContent = '已复制推荐内容';
+          } catch (e) { $('#inviteMsg').textContent = '复制失败'; }
+        };
+        $('#inviteRefresh').onclick = async () => {
+          $('#inviteMsg').textContent = '正在重新读取…';
+          await api('/api/invite/refresh', { method: 'POST' });
+          refreshLogin();
+        };
+      }
+    } catch (e) {
+      inviteCard.style.display = 'none';
+    }
   } catch (e) {
     card.innerHTML = '<div class="err">读取状态失败：' + esc(e.message) + '</div>';
   }
@@ -873,12 +982,19 @@ function museSafetyHtml(m) {
       const yn = (v) => v ? '<span class="pill yes">✓</span>' : '<span class="pill no">✗</span>';
       const left = a.session_left_seconds
         ? (a.session_left_seconds / 3600).toFixed(1) + ' 小时' : '—';
+      // 两个独立的额度池：周限额会重置，额外额度从不过期
+      const weekly = a.weekly_used_pct == null ? '—'
+        : a.weekly_used_pct + '%' + (a.weekly_reset ? '（' + esc(a.weekly_reset) + ' 重置）' : '');
+      const extra = a.extra_left
+        ? esc(a.extra_left) + (a.extra_expires === 'never' ? ' · 从不过期' : '')
+        : (a.extra_used_pct == null ? '—' : a.extra_used_pct + '%');
       html += '<tr><td>' + esc(a.label) + '</td>' +
         '<td>' + yn(c.session_ok && c.session_valid) + '</td>' +
         '<td>' + yn(c.essential_cookies) + '</td>' +
         '<td>' + yn(c.proxy_configured && c.proxy_reachable) + '</td>' +
         '<td>' + yn(c.exit_ip_match) + '</td>' +
-        '<td class="mono">' + esc(a.weekly_used_pct == null ? '—' : a.weekly_used_pct + '%') + '</td>' +
+        '<td class="mono">' + weekly + '</td>' +
+        '<td class="mono">' + extra + '</td>' +
         '<td class="mono">' + esc(left) + '</td>' +
         '<td>' + (a.ok ? '<span class="pill yes">正常</span>'
                        : '<span class="pill no">' + esc((a.issues || []).join('、')) + '</span>') +
@@ -999,8 +1115,9 @@ async function loadServices() {
     const d = await api('/api/status');
     const s = d.services;
     card.innerHTML =
-      svcRow('muse2api', 'muse2api 服务', s.muse2api) +
-      svcRow('chain', '链式中继', s.chain) +
+      Object.keys(s).map(k => svcRow(k,
+        k === 'chain' ? '链式中继' : ((s[k] && s[k].label) || k),
+        s[k])).join('') +
       '<div class="row" style="margin-top:14px"><button class="btn" id="reloadSvc">刷新状态</button></div>';
     $('#reloadSvc').addEventListener('click', loadServices);
     bindSvcButtons();
@@ -1132,7 +1249,7 @@ function bindSvcButtons() {
 
 /* ---------- boot ---------- */
 $('#regions').textContent = 'US / CA / JP / SG / MX / AU';
-loadExit();
+loadUpstreams().then(loadExit);
 </script>
 </body>
 </html>

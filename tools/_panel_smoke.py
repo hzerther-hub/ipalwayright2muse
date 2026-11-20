@@ -190,6 +190,38 @@ def main():
                   "hatch_sess" in (account.get("cookie_names") or []))
             break
 
+    # ---- /api/upstreams ---------------------------------------------------
+    try:
+        ups = get("/api/upstreams")
+    except Exception as exc:  # noqa: BLE001
+        check("/api/upstreams reachable", False, str(exc)[:80])
+        ups = {}
+    if ups:
+        check("/api/upstreams lists the registry",
+              "muse2api" in (ups.get("upstreams") or []),
+              "upstreams=%s" % (ups.get("upstreams") or []))
+        check("/api/upstreams names the current one",
+              bool(ups.get("current")), "current=%s" % ups.get("current"))
+
+    # ---- /api/invite ------------------------------------------------------
+    try:
+        inv = get("/api/invite")
+    except Exception as exc:  # noqa: BLE001
+        check("/api/invite reachable", False, str(exc)[:80])
+        inv = {}
+    if inv and inv.get("ok"):
+        check("/api/invite reports the remaining uses",
+              isinstance(inv.get("remaining_uses"), int),
+              "uses=%s" % inv.get("remaining_uses"))
+        check("/api/invite reports the per-use credit",
+              isinstance(inv.get("credits_per_use_billion"), (int, float)),
+              "credit=%s 亿" % inv.get("credits_per_use_billion"))
+        check("/api/invite reports the redeem window",
+              isinstance(inv.get("redeem_window_hours"), int),
+              "window=%sh" % inv.get("redeem_window_hours"))
+        check("/api/invite has the invite code", bool(inv.get("invite_code")),
+              "code=%s" % inv.get("invite_code"))
+
     # ---- /api/catalog ----------------------------------------------------
     try:
         c = get("/api/catalog", timeout=120)

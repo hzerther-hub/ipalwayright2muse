@@ -132,6 +132,8 @@ def muse_dir_state():
 
 sys.path.insert(0, TOOLS)
 sys.path.insert(0, LIB)
+sys.path.insert(0, REPO)
+import upstreams  # noqa: E402
 try:
     import ipdeep_catalog  # noqa: E402
 except Exception:  # noqa: BLE001  - catalogue is optional
@@ -224,6 +226,77 @@ def _muse_post(path, payload=None, timeout=60):
         return {"error": "响应不是 JSON"}
 
 
+# --------------------------------------------------------------------------
+# upstream-agnostic API client
+# --------------------------------------------------------------------------
+
+def upstream_request(upstream_id, method, path, payload=None, timeout=60):
+    """Call any registered upstream's admin API.
+
+    Every upstream speaks the same contract (see upstreams.py), so the panel
+    needs one client rather than one per service.
+    """
+    spec = upstreams.get(upstream_id)
+    if not spec:
+        return {"error": "未知的上游：%s" % upstream_id}
+    key = upstreams.api_key_of(spec)
+    if not key:
+        return {"error": "读不到 %s 的访问密钥" % (spec.get("key_env") or "API Key")}
+    url = upstreams.admin_base(spec) + path
+    data = None
+    headers = {"Authorization": "Bearer " + key}
+    if payload is not None:
+        data = json.dumps(payload).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as exc:
+        return {"error": "HTTP %d: %s" % (exc.code,
+                                          exc.read().decode("utf-8", "replace")[:200])}
+    except Exception as exc:  # noqa: BLE001
+        return {"error": "%s: %s" % (type(exc).__name__, exc)}
+    try:
+        return json.loads(body)
+    except ValueError:
+        return {"error": "响应不是 JSON"}
+
+
+def upstream_accounts(upstream_id):
+    """The upstream's account pool, straight from its own store on disk."""
+    spec = upstreams.get(upstream_id)
+    if not spec:
+        return []
+    data_dir = spec.get("data_dir")
+    if not data_dir:
+        data_dir = os.path.join(spec.get("cwd") or "", "data")
+    path = os.path.join(data_dir, "accounts.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def upstream_id():
+    """The upstream the panel is currently pointed at."""
+    return _UPSTREAM
+
+
+_UPSTREAM = os.environ.get("PANEL_UPSTREAM", "").strip() or "muse2api"
+
+
+def set_upstream(upstream_id_value):
+    """Point the panel at a different upstream (process-wide)."""
+    global _UPSTREAM
+    if not upstreams.get(upstream_id_value):
+        return False
+    _UPSTREAM = upstream_id_value
+    os.environ["PANEL_UPSTREAM"] = upstream_id_value
+    return True
+
+
 def _account_store():
     """muse2api 的账号池落盘文件（含 cookie 与代理口令，管理接口不回传）。"""
     path = os.path.join(MUSE_DATA, "accounts.json")
@@ -257,17 +330,20 @@ def _muse_get(path, timeout=30):
 
 def api_key_info():
     """The service's access key and the URLs clients connect to."""
-    data = _muse_get("/admin/apikey")
+    upstream = upstream_id()
+    data = upstream_request(upstream, "GET", "/apikey")
     if "error" in data:
         return data
     base_url = data.get("base_url") or ""
     if not base_url:
-        # MUSE2API_PUBLIC_BASE is empty -> the admin page derives the host
-        # from the browser. The panel cannot, so give the local address.
-        base_url = "http://127.0.0.1:%d/v1" % MUSE_PORT
+        # The public base is unset -> the admin page derives the host from
+        # the browser. The panel cannot, so give the local address.
+        spec = upstreams.get(upstream) or {}
+        base_url = (spec.get("base") or "").rstrip("/") + "/v1"
     models_url = data.get("models_url") or (base_url + "/models")
     media_url = data.get("media_url") or "/v1/media/{name}"
     return {
+        "upstream": upstream,
         "api_key": data.get("api_key") or "",
         "base_url": base_url,
         "models_url": models_url,
@@ -277,11 +353,13 @@ def api_key_info():
 
 def api_key_rotate():
     """Generate a fresh access key. The old one stops working immediately."""
-    data = _muse_post("/admin/apikey/rotate", {}, timeout=30)
+    upstream = upstream_id()
+    data = upstream_request(upstream, "POST", "/apikey/rotate", {}, timeout=30)
     if "error" in data:
         return data
     return {
         "ok": bool(data.get("ok")),
+        "upstream": upstream,
         "api_key": data.get("api_key") or "",
         "previous": data.get("previous") or "",
         "message": data.get("message") or "",
@@ -687,12 +765,17 @@ def static_exit_check(rounds=3, gap=1.2):
 
 
 def muse2api_safety(exit_data=None, static_data=None):
-    """Judge whether muse2api is safe to run on the current egress."""
+    """Judge whether the current upstream is safe to run on this egress."""
+    upstream = upstream_id()
+    spec = upstreams.get(upstream) or {}
+    port = _port_of(spec)
+    label = spec.get("label") or upstream
     result = {
         "verdict": "unknown",
         "headline": "",
         "service_running": False,
         "browser_running": False,
+        "upstream": upstream,
         "exit_ip": (exit_data or {}).get("ip") or "",
         "accounts": [],
         "issues": [],
@@ -700,26 +783,23 @@ def muse2api_safety(exit_data=None, static_data=None):
         "confirmations": [],
     }
 
-    if not _port_open("127.0.0.1", MUSE_PORT):
+    if not port or not _port_open("127.0.0.1", port):
         result["verdict"] = "bad"
-        result["headline"] = "muse2api 服务未运行（%d 端口无监听）" % MUSE_PORT
+        result["headline"] = "%s 服务未运行（%s 端口无监听）" % (label, port)
         result["issues"].append("服务未启动，请在「服务控制」页启动")
         return result
     result["service_running"] = True
 
-    key = _muse_env().get("MUSE2API_KEY", "")
-    if not key:
+    if not upstreams.api_key_of(spec):
         result["verdict"] = "bad"
-        result["headline"] = "读不到 MUSE2API_KEY，无法校验 muse2api"
-        result["issues"].append("muse2api/.env 缺少 MUSE2API_KEY")
+        result["headline"] = "读不到 %s 的访问密钥，无法校验" % label
+        result["issues"].append("%s 的密钥未配置" % label)
         return result
 
-    data = _json_get(
-        "http://127.0.0.1:%d/admin/status" % MUSE_PORT, timeout=40,
-        headers={"Authorization": "Bearer " + key})
-    if not data:
+    data = upstream_request(upstream, "GET", "/status", timeout=40)
+    if not data or "error" in data:
         result["verdict"] = "bad"
-        result["headline"] = "无法读取 muse2api /admin/status"
+        result["headline"] = "无法读取 %s 的管理接口" % label
         result["issues"].append("管理接口无响应")
         return result
 
@@ -767,8 +847,21 @@ def muse2api_safety(exit_data=None, static_data=None):
         if expires and session_left < SESSION_WARN_SECONDS:
             issues.append("会话将在 %.1f 小时后过期" % (session_left / 3600))
         used = quota.get("weekly_used_pct")
+        extra_used = quota.get("extra_used_pct")
+        extra_left = quota.get("extra_left") or ""
+        extra_never = quota.get("extra_expires") == "never"
+        # The weekly allowance and the additional credits are two separate
+        # pools. Running the weekly one out does not mean the account is
+        # spent - the additional credits never expire, so they are what
+        # actually decides whether generation still works.
+        extra_available = bool(extra_left) and (
+            not isinstance(extra_used, int) or extra_used < 100)
         if isinstance(used, int) and used >= 100:
-            issues.append("周限额已用满（%d%%）" % used)
+            if extra_available:
+                notes.append("周限额已用满（%d%%），但额外额度仍有余量（%s）"
+                             % (used, extra_left))
+            else:
+                issues.append("周限额已用满（%d%%），且额外额度也已耗尽" % used)
         elif isinstance(used, int) and used >= 80:
             notes.append("周限额已用 %d%%" % used)
 
@@ -778,6 +871,11 @@ def muse2api_safety(exit_data=None, static_data=None):
             "checks": checks,
             "session_left_seconds": int(session_left) if expires else 0,
             "weekly_used_pct": used,
+            "weekly_reset": quota.get("weekly_reset") or "",
+            "quota_plan": quota.get("plan") or "",
+            "extra_used_pct": extra_used,
+            "extra_left": extra_left,
+            "extra_expires": "never" if extra_never else "",
             "account_exit_ip": pstatus.get("exit_ip") or "",
             "issues": issues,
             "notes": notes,
@@ -816,13 +914,13 @@ def muse2api_safety(exit_data=None, static_data=None):
     result["notes"] = soft
     if hard:
         result["verdict"] = "bad"
-        result["headline"] = "muse2api 当前不安全：%s" % "、".join(hard[:3])
+        result["headline"] = "%s 当前不安全：%s" % (label, "、".join(hard[:3]))
     elif soft:
         result["verdict"] = "warn"
-        result["headline"] = "muse2api 可用，但有 %d 项提示" % len(soft)
+        result["headline"] = "%s 可用，但有 %d 项提示" % (label, len(soft))
     else:
         result["verdict"] = "safe"
-        result["headline"] = "muse2api 安全：出口、会话、代理、额度全部正常"
+        result["headline"] = "%s 安全：出口、会话、代理、额度全部正常" % label
     return result
 
 
@@ -1044,33 +1142,34 @@ def _process_start_time(pid):
 
 
 def service_status(target):
-    if target == "muse2api":
-        pid = _listening_pid(MUSE_PORT)
-        return {"target": target, "port": MUSE_PORT, "running": bool(pid), "pid": pid,
-                "started_at": _process_start_time(pid) if pid else None}
+    """Status of a managed service. "chain" is the local relay; anything
+    else is a registered upstream."""
     if target == "chain":
         pid = _listening_pid(RELAY_LISTEN[1])
-        return {"target": target, "port": RELAY_LISTEN[1], "running": bool(pid), "pid": pid,
-                "started_at": _process_start_time(pid) if pid else None}
-    return {"error": "unknown target"}
+        return {"target": target, "port": RELAY_LISTEN[1], "running": bool(pid),
+                "pid": pid, "started_at": _process_start_time(pid) if pid else None}
+    spec = upstreams.get(target)
+    if not spec:
+        return {"error": "unknown target"}
+    port = _port_of(spec)
+    pid = _listening_pid(port)
+    return {"target": target, "label": spec.get("label") or target, "port": port,
+            "running": bool(pid), "pid": pid,
+            "started_at": _process_start_time(pid) if pid else None}
+
+
+def _port_of(spec):
+    base = spec.get("base") or ""
+    try:
+        return int(base.rsplit(":", 1)[1])
+    except (IndexError, ValueError):
+        return 0
 
 
 def service_start(target):
     status = service_status(target)
     if status.get("running"):
         return {"ok": True, "message": "already running", "pid": status.get("pid")}
-
-    if target == "muse2api":
-        log = open(os.path.join(MUSE_DATA, "server.out.log"), "a", encoding="utf-8")
-        creation = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | \
-            getattr(subprocess, "DETACHED_PROCESS", 0)
-        proc = subprocess.Popen(
-            [sys.executable, "-m", "uvicorn", "app:app", "--host", "0.0.0.0",
-             "--port", str(MUSE_PORT)],
-            cwd=MUSE_DIR, stdout=log, stderr=subprocess.STDOUT,
-            creationflags=creation, close_fds=True)
-        time.sleep(3.0)
-        return {"ok": True, "message": "muse2api started", "pid": proc.pid}
 
     if target == "chain":
         proc = subprocess.run(
@@ -1084,7 +1183,29 @@ def service_start(target):
                 "message": (output or errors or "").strip()[-300:],
                 "pid": status.get("pid")}
 
-    return {"ok": False, "message": "unknown target"}
+    spec = upstreams.get(target)
+    if not spec:
+        return {"ok": False, "message": "unknown target"}
+    command = spec.get("start")
+    if not command:
+        return {"ok": False, "message": "上游 %s 没有定义启动命令" % target}
+    cwd = spec.get("cwd") or REPO
+    data_dir = spec.get("data_dir") or os.path.join(cwd, "data")
+    try:
+        os.makedirs(data_dir, exist_ok=True)
+        log = open(os.path.join(data_dir, "server.out.log"), "a", encoding="utf-8")
+    except OSError:
+        log = subprocess.DEVNULL
+    creation = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | \
+        getattr(subprocess, "DETACHED_PROCESS", 0)
+    try:
+        proc = subprocess.Popen(command, cwd=cwd, stdout=log,
+                                stderr=subprocess.STDOUT,
+                                creationflags=creation, close_fds=True)
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "message": "启动失败：%s" % exc}
+    time.sleep(3.0)
+    return {"ok": True, "message": "%s started" % target, "pid": proc.pid}
 
 
 def service_stop(target):
@@ -1092,8 +1213,10 @@ def service_stop(target):
     if not status.get("running"):
         return {"ok": True, "message": "not running"}
     pid = status["pid"]
+    # Bytes, not text: taskkill writes the console codepage, and decoding it
+    # as UTF-8 raises inside the reader thread and kills the call.
     subprocess.run(["taskkill", "/PID", str(pid), "/F", "/T"],
-                   capture_output=True, text=True, timeout=30)
+                   capture_output=True, timeout=30)
     time.sleep(1.5)
     after = service_status(target)
     return {"ok": not after.get("running"),
@@ -1108,12 +1231,14 @@ def service_restart(target):
 
 
 def status():
-    """Overall panel status."""
-    muse = service_status("muse2api")
-    chain = service_status("chain")
+    """Overall panel status - every registered upstream plus the relay."""
+    services = {}
+    for uid in upstreams.ids():
+        services[uid] = service_status(uid)
+    services["chain"] = service_status("chain")
     return {
         "panel": {"port": PANEL_PORT, "repo": REPO},
-        "services": {"muse2api": muse, "chain": chain},
+        "services": services,
         "exit": exit_ip(),
         "muse_regions": list(MUSE_REGIONS),
         "now": int(time.time()),

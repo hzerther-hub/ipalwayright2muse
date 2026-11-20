@@ -1,0 +1,23 @@
+{
+  "_comment": [
+    "上游注册表示例。复制成 upstreams.json 后按自己的机器改路径。",
+    "upstreams.json 已被 .gitignore 排除——里面是本机路径，不入库。",
+    "面板只认上游契约（见 upstreams.py 顶部），任何实现这组管理接口的服务",
+    "都能被面板接管：出口保证、账号池、登录、API Key、服务启停。"
+  ],
+  "deepseek2api": {
+    "label": "deepseek2api",
+    "base": "http://127.0.0.1:18612",
+    "admin": "/admin",
+    "health": "/healthz",
+    "key_env": "DEEPSEEK2API_KEY",
+    "key_file": "<deepseek2api 的目录>/.env",
+    "cwd": "<deepseek2api 的目录>",
+    "start": [
+      "python",
+      "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "18612"
+    ],
+    "browser": false,
+    "note": "DeepSeek 网页版聊天（/api/v0/chat/completion），纯对话"
+  }
+}

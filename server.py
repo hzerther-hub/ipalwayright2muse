@@ -20,7 +20,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import core  # noqa: E402
 import guarantee  # noqa: E402
+import invite as invite_module  # noqa: E402
 import login as muse_login  # noqa: E402
+import upstreams  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(HERE, "static")
@@ -92,12 +94,29 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
+        # ?upstream=<id> switches which registered upstream the panel talks to.
+        wanted = (query.get("upstream") or [""])[0].strip()
+        if wanted:
+            core.set_upstream(wanted)
         try:
             if path == "/api/status":
                 self._send_json(core.status())
                 return
             if path == "/api/layout":
                 self._send_json(core.muse_dir_state())
+                return
+            if path == "/api/invite":
+                snap = invite_module.READER.cached()
+                if snap is None:
+                    snap = invite_module.READER.read()
+                self._send_json(snap)
+                return
+            if path == "/api/quota":
+                self._send_json(invite_module.quota_view())
+                return
+            if path == "/api/upstreams":
+                self._send_json({"upstreams": upstreams.ids(),
+                                 "current": core.upstream_id()})
                 return
             if path == "/api/exit":
                 ip = (query.get("ip") or [""])[0].strip()
@@ -143,6 +162,11 @@ class Handler(BaseHTTPRequestHandler):
                     and parts[2] == "rotate":
                 self._send_json(core.api_key_rotate())
                 return
+            # ---- 邀请码 ----
+            if len(parts) == 3 and parts[0] == "api" and parts[1] == "invite" \
+                    and parts[2] == "refresh":
+                self._send_json(invite_module.READER.read(force=True))
+                return
             # ---- muse.ai 登录 ----
             if len(parts) == 3 and parts[0] == "api" and parts[1] == "login":
                 action = parts[2]
@@ -174,8 +198,11 @@ class Handler(BaseHTTPRequestHandler):
             # /api/service/{target}/{action}
             if len(parts) == 4 and parts[0] == "api" and parts[1] == "service":
                 target, action = parts[2], parts[3]
-                if target not in ("muse2api", "chain"):
-                    self._send_json({"ok": False, "message": "unknown target"}, status=400)
+                known = set(upstreams.ids()) | {"chain"}
+                if target not in known:
+                    self._send_json({"ok": False,
+                                     "message": "unknown target: %s" % target},
+                                    status=400)
                     return
                 if action == "start":
                     result = core.service_start(target)

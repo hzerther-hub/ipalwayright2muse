@@ -417,7 +417,8 @@ class LoginManager:
             "cookies": dict(session.cookies),
             "expires": dict(session.expires),
         }
-        res = core._muse_post("/admin/accounts", payload, timeout=60)
+        res = core.upstream_request(core.upstream_id(), "POST",
+                                   "/accounts", payload, timeout=60)
         if "error" in res:
             return {"ok": False, "message": res["error"]}
         account = res.get("account") or res

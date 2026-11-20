@@ -69,39 +69,15 @@ HISTORY_LIMIT = 20
 # muse2api 管理接口
 # --------------------------------------------------------------------------
 
-def _muse_key():
-    return (core._muse_env() or {}).get("MUSE2API_KEY", "")
-
-
 def _muse_admin(method, path, payload=None, timeout=60):
-    """Call muse2api's admin API with the shared bearer key."""
-    key = _muse_key()
-    if not key:
-        return {"error": "读不到 MUSE2API_KEY"}
-    data = None
-    headers = {"Authorization": "Bearer " + key}
-    if payload is not None:
-        data = json.dumps(payload).encode("utf-8")
-        headers["Content-Type"] = "application/json"
-    req = urllib.request.Request(MUSE_BASE + path, data=data,
-                                 headers=headers, method=method)
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = resp.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as exc:
-        return {"error": "HTTP %d: %s" % (exc.code,
-                                          exc.read().decode("utf-8", "replace")[:200])}
-    except Exception as exc:  # noqa: BLE001
-        return {"error": "%s: %s" % (type(exc).__name__, exc)}
-    try:
-        return json.loads(body)
-    except ValueError:
-        return {"error": "响应不是 JSON"}
+    """Call the current upstream's admin API (the upstream contract)."""
+    return core.upstream_request(core.upstream_id(), method, path, payload,
+                                 timeout)
 
 
 def _account_store():
-    """muse2api 的账号池落盘文件（含代理口令，管理接口不回传）。"""
-    path = os.path.join(core.MUSE_DATA, "accounts.json")
+    """上游的账号池落盘文件（含代理口令，管理接口不回传）。"""
+    path = os.path.join(core.MUSE_DATA, "accounts.json")  # muse2api store
     try:
         with open(path, encoding="utf-8") as f:
             return json.load(f)
@@ -612,7 +588,7 @@ def _live_browser_probe(proxy_server):
     try:
         info = http_json("http://127.0.0.1:%d/json/version" % port, timeout=5)
         if not info or not info.get("webSocketDebuggerUrl"):
-            out["error"] = "muse2api 的浏览器 CDP 端点未就绪"
+            out["error"] = "上游的浏览器 CDP 端点未就绪"
             return out
         browser = CDP(info["webSocketDebuggerUrl"], timeout=90)
 
@@ -622,7 +598,7 @@ def _live_browser_probe(proxy_server):
         })
         ctx_id = res.get("result", {}).get("browserContextId")
         if not ctx_id:
-            out["error"] = "muse2api 浏览器没有返回上下文 ID"
+            out["error"] = "上游浏览器没有返回上下文 ID"
             return out
 
         # The default context of that browser shows what the system proxy
@@ -638,7 +614,7 @@ def _live_browser_probe(proxy_server):
         out["proxied_ip"] = _read_ip(browser, port, ctx_id)
         out["ok"] = bool(out["proxied_ip"])
         if not out["ok"]:
-            out["error"] = "muse2api 浏览器没有回显出口 IP"
+            out["error"] = "上游浏览器没有回显出口 IP"
     except Exception as exc:  # noqa: BLE001
         out["error"] = "%s: %s" % (type(exc).__name__, exc)
     finally:
@@ -912,7 +888,7 @@ def verify(enforce=False):
       第4步 muse2api 可以用
     """
     started = time.time()
-    status = _muse_admin("GET", "/admin/status")
+    status = _muse_admin("GET", "/status")
     if "error" in status:
         status = {}
 
@@ -973,7 +949,7 @@ def enforce_report(report):
             aid = offender.get("id")
             if not aid:
                 continue
-            res = _muse_admin("PATCH", "/admin/accounts/%s" % aid,
+            res = _muse_admin("PATCH", "/accounts/%s" % aid,
                               {"enabled": False}, timeout=30)
             ok = "error" not in res
             enforced.append({

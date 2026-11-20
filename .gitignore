@@ -22,3 +22,6 @@ panel.env
 .vscode/
 .DS_Store
 Thumbs.db
+
+# 本机上游注册表（按机器路径定制，不入库）
+upstreams.json
