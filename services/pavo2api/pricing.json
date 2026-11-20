@@ -1,0 +1,57 @@
+{
+  "_source": "Pavo 积分超市页面（app.pavo-ai.cn 登录后可见），2026-11-20 截图记录",
+  "unit": "秒（视频生成秒数）",
+  "section": "Flash 加速包",
+  "section_note": "『加速通道，优先生成·性价比之选』——这是 Flash 模型的专属包。旗舰模型（Seedance 2.5 / Seedream 5.5 等）的积分价格在同一页面的其它分区，未包含在此。",
+  "list_unit_price_cny_per_second": 0.15,
+  "packs": [
+    {
+      "tier": "轻量体验", "credits_seconds": 600, "price_cny": 39,
+      "list_cny": 90, "tag": "特惠", "valid_days": 30,
+      "unit_cny_per_second": 0.065, "discount": 0.567,
+      "purchase_limit": "不限购"
+    },
+    {
+      "tier": "日常创作", "credits_seconds": 800, "price_cny": 49,
+      "list_cny": 120, "tag": "热销", "valid_days": 30,
+      "unit_cny_per_second": 0.0613, "discount": 0.592,
+      "purchase_limit": "不限购"
+    },
+    {
+      "tier": "高频创作", "credits_seconds": 1500, "price_cny": 79,
+      "list_cny": 225, "tag": "立省", "valid_days": 30,
+      "unit_cny_per_second": 0.0527, "discount": 0.649,
+      "purchase_limit": "不限购"
+    },
+    {
+      "tier": "工作储备", "credits_seconds": 3000, "price_cny": 119,
+      "list_cny": 450, "tag": "超值装", "valid_days": 60,
+      "unit_cny_per_second": 0.0397, "discount": 0.736,
+      "purchase_limit": "不限购"
+    }
+  ],
+  "economics": {
+    "best_unit_price_cny_per_second": 0.0397,
+    "cost_per_10s_video_cny": {
+      "600秒包": 0.65,
+      "800秒包": 0.61,
+      "1500秒包": 0.53,
+      "3000秒包": 0.40
+    },
+    "break_even_note": "官方同款模型的按秒单价高于 ¥0.0397/秒 即为净省。这条线需要拿官方定价页核对（火山引擎 Seedance / Kling 官方均为 JS 渲染，脚本抓不到）。",
+    "expiry_note": "积分会过期（30 或 60 天），与 Muse 的『从不过期』不同——不能像 Muse 那样攒着，闲置就是浪费。"
+  },
+  "terms": {
+    "source": "Pavo 服务条款 第六章『付费功能与支付』",
+    "quotes": [
+      "6.1 本网站可能同时提供免费功能和付费功能（以下简称『付费功能』）。使用付费功能可能需要支付费用、订阅费或其他款项（以下简称『费用』）。除本条款另有约定或适用法律另有规定外，所有费用一经支付概不退还。",
+      "6.2 如您购买付费功能，您同意使用您提供的支付方式（例如本网站提供的支付宝或其他支付渠道）支付全部相应费用。……价格可能调整，恕不另行通知，但任何价格变更在生效前我们会提前告知您。",
+      "6.3 付费功能的订阅将在每个订阅周期结束时自动续订，除非您在当前周期结束前取消订阅。"
+    ]
+  },
+  "cost_control_endpoints": {
+    "estimate": "POST /v1/aigc/credits/estimate",
+    "calculate": "POST /v1/aigc/credits/calculate",
+    "note": "生成前先算价——这是『省钱』包装最有价值的能力：可以先算出这次要花多少积分，确认值得再生成。"
+  }
+}
