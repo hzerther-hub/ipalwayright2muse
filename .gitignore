@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+
+# 面板自身的数据目录（含明文凭据：IPDEEP 代理账号密码）
+data/*
+!data/.gitkeep
+
+# 本机配置（指向 muse2api 部署目录）
+panel.env
+
+# 日志与临时产物
+*.log
+*.pid
+*.bak
+*.tmp
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

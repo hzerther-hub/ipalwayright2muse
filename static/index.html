@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>静态出口 IP 合规面板 · muse2api</title>
+<style>
+:root{
+  --bg:#0a0e17; --bg2:#0e1421; --panel:#121a2b; --panel2:#0f1626;
+  --line:#1e2740; --line2:#2a3555;
+  --text:#e6e8ee; --muted:#8b95ad; --accent:#4f8cff;
+  --ok:#35c26a; --warn:#e0a33a; --bad:#e05b5b;
+  --radius:12px; --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;
+}
+.app{display:flex;min-height:100vh}
+
+/* ---------- sidebar ---------- */
+.sidebar{
+  width:216px;flex:0 0 216px;background:var(--bg2);
+  border-right:1px solid var(--line);display:flex;flex-direction:column;
+  position:sticky;top:0;height:100vh;
+}
+.brand{padding:18px 16px 14px;border-bottom:1px solid var(--line)}
+.brand h1{margin:0;font-size:15px;letter-spacing:.3px}
+.brand p{margin:4px 0 0;font-size:11px;color:var(--muted)}
+.nav{padding:10px 8px;display:flex;flex-direction:column;gap:2px;flex:1}
+.nav button{
+  appearance:none;border:0;background:transparent;color:var(--muted);
+  text-align:left;padding:10px 12px;border-radius:9px;cursor:pointer;
+  font-size:13.5px;display:flex;align-items:center;gap:9px;transition:.12s;
+}
+.nav button:hover{background:rgba(79,140,255,.09);color:var(--text)}
+.nav button.active{background:rgba(79,140,255,.16);color:var(--text);box-shadow:inset 2px 0 0 var(--accent)}
+.nav button .dot{width:6px;height:6px;border-radius:50%;background:var(--line2);flex:0 0 6px}
+.nav button.active .dot{background:var(--accent)}
+.side-foot{padding:12px 16px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);line-height:1.7}
+.side-foot code{font-family:var(--mono);color:#9fb3d9}
+
+/* ---------- main ---------- */
+main{flex:1;min-width:0;padding:22px 26px 60px;max-width:1400px}
+.view{display:none}
+.view.active{display:block}
+h2{margin:0 0 4px;font-size:19px}
+.sub{margin:0 0 18px;color:var(--muted);font-size:13px}
+.card{
+  background:linear-gradient(180deg,var(--panel) 0%,var(--panel2) 100%);
+  border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:16px;
+}
+.card h3{margin:0 0 12px;font-size:13px;color:var(--muted);font-weight:600;
+  text-transform:uppercase;letter-spacing:.6px}
+.row{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+
+/* verdict hero */
+.hero{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap}
+.ip{font-family:var(--mono);font-size:30px;letter-spacing:.5px;line-height:1.15}
+.ip-sub{color:var(--muted);margin-top:6px;font-size:13px}
+.badge{
+  display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;
+  font-size:13px;font-weight:600;border:1px solid transparent;white-space:nowrap;
+}
+.badge.ok{background:rgba(53,194,106,.14);color:#5fd98d;border-color:rgba(53,194,106,.35)}
+.badge.warn{background:rgba(224,163,58,.14);color:#f0bd63;border-color:rgba(224,163,58,.35)}
+.badge.bad{background:rgba(224,91,91,.14);color:#f07f7f;border-color:rgba(224,91,91,.35)}
+.badge.idle{background:rgba(139,149,173,.12);color:var(--muted);border-color:var(--line2)}
+.score{font-family:var(--mono);font-size:26px}
+.score small{font-size:11px;color:var(--muted);display:block;text-align:center;letter-spacing:1px}
+
+/* tables */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.5px}
+tbody tr:hover{background:rgba(255,255,255,.025)}
+td.mono,th.mono{font-family:var(--mono)}
+tr.current{background:rgba(79,140,255,.10)}
+tr.current td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
+.scroll{overflow:auto;max-height:520px}
+.pill{padding:2px 8px;border-radius:999px;font-size:11.5px;border:1px solid var(--line2);color:var(--muted)}
+.pill.yes{color:#5fd98d;border-color:rgba(53,194,106,.4);background:rgba(53,194,106,.10)}
+.pill.no{color:#f07f7f;border-color:rgba(224,91,91,.35);background:rgba(224,91,91,.08)}
+.pill.promo{color:#f0bd63;border-color:rgba(224,163,58,.4);background:rgba(224,163,58,.10)}
+
+/* inputs + buttons */
+input[type=text],input[type=number]{
+  background:var(--bg);border:1px solid var(--line2);color:var(--text);
+  padding:9px 12px;border-radius:8px;font-size:13px;font-family:var(--mono);min-width:200px;
+}
+input:focus{outline:none;border-color:var(--accent)}
+button.btn{
+  appearance:none;border:1px solid var(--line2);background:var(--panel);color:var(--text);
+  padding:8px 15px;border-radius:8px;cursor:pointer;font-size:13px;transition:.12s;
+}
+button.btn:hover:not(:disabled){border-color:var(--accent);background:rgba(79,140,255,.12)}
+button.btn:disabled{opacity:.45;cursor:not-allowed}
+button.btn.primary{background:rgba(79,140,255,.16);border-color:rgba(79,140,255,.45)}
+button.btn.danger:hover:not(:disabled){border-color:var(--bad);background:rgba(224,91,91,.12)}
+a.btn{
+  display:inline-block;text-decoration:none;border:1px solid var(--line2);background:var(--panel);
+  color:var(--text);padding:8px 15px;border-radius:8px;font-size:13px;transition:.12s;
+}
+a.btn:hover{border-color:var(--accent);background:rgba(79,140,255,.12)}
+.mono{font-family:var(--mono)}
+label.sw{display:inline-flex;align-items:center;gap:7px;color:var(--muted);font-size:13px;cursor:pointer}
+
+/* service rows */
+.svc{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--line)}
+.svc:last-child{border-bottom:0}
+.led{width:9px;height:9px;border-radius:50%;background:var(--line2);flex:0 0 9px}
+.led.on{background:var(--ok);box-shadow:0 0 9px rgba(53,194,106,.65)}
+.led.off{background:var(--bad)}
+.svc-name{font-weight:600;min-width:150px}
+.svc-meta{color:var(--muted);font-size:12px;font-family:var(--mono);flex:1}
+
+/* chain health */
+.health{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+.hstep{
+  display:flex;align-items:center;gap:8px;padding:8px 13px;border-radius:9px;
+  background:var(--bg);border:1px solid var(--line);font-size:12.5px;
+}
+.chk{
+  display:flex;align-items:center;gap:8px;padding:8px 13px;border-radius:9px;
+  background:var(--bg);border:1px solid var(--line);font-size:12.5px;
+}
+.chk.pass{border-color:rgba(53,194,106,.38);color:#8fe0ae}
+.chk.fail{border-color:rgba(224,91,91,.42);color:#f09d9d}
+.chk.warn{border-color:rgba(224,163,58,.42);color:#f0c789}
+.chk .k{color:var(--muted)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px;margin-top:10px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;font-family:var(--mono)}
+.note{
+  margin-top:12px;padding:12px 14px;border-radius:9px;font-size:13px;line-height:1.6;
+  background:rgba(79,140,255,.08);border:1px solid rgba(79,140,255,.25);color:#bcd2f7;
+}
+.note.warn{background:rgba(224,163,58,.09);border-color:rgba(224,163,58,.3);color:#f0c789}
+.note.bad{background:rgba(224,91,91,.09);border-color:rgba(224,91,91,.3);color:#f5a3a3}
+.err{color:#f07f7f;font-size:13px;padding:10px 0}
+.hint{color:var(--muted);font-size:12px;margin-top:8px}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid var(--line2);
+  border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <h1>静态出口 IP 面板</h1>
+      <p>muse2api · 本地合规检测</p>
+    </div>
+    <nav class="nav" id="nav">
+      <button data-view="exit" class="active"><span class="dot"></span>出口合规</button>
+      <button data-view="guarantee"><span class="dot"></span>出口保证</button>
+      <button data-view="login"><span class="dot"></span>账号登录</button>
+      <button data-view="catalog"><span class="dot"></span>选点目录</button>
+      <button data-view="hop"><span class="dot"></span>跳板状态</button>
+      <button data-view="service"><span class="dot"></span>服务控制</button>
+    </nav>
+    <div class="side-foot">
+      Muse 可用地区<br><code id="regions">US / CA / JP / SG / MX / AU</code><br>
+      面板 <code>127.0.0.1:18611</code>
+    </div>
+  </aside>
+
+  <main>
+    <!-- ============ 出口合规 ============ -->
+    <section class="view active" id="view-exit">
+      <h2>出口合规</h2>
+      <p class="sub">经链式中继实测当前出口，并按 Muse 地区政策 + 多源风险评分判定。</p>
+      <div class="card" id="exitCard"><span class="spin"></span> 正在检测出口…</div>
+      <div class="card" id="staticCard"><span class="spin"></span> 正在校验静态出口…</div>
+      <div class="card" id="safetyCard"><span class="spin"></span> 正在评估 muse2api 安全性…</div>
+      <div class="card">
+        <h3>任意 IP 检测</h3>
+        <div class="row">
+          <input type="text" id="probeIp" placeholder="输入要检测的 IP，例如 8.8.8.8">
+          <button class="btn primary" id="probeBtn">检测</button>
+          <button class="btn" id="probeClear">清除</button>
+        </div>
+        <div class="hint">结果只做只读查询，不会修改任何配置。</div>
+        <div id="probeResult"></div>
+      </div>
+    </section>
+
+    <!-- ============ 出口保证 ============ -->
+    <section class="view" id="view-guarantee">
+      <h2>出口保证</h2>
+      <p class="sub">按顺序核验：跳板是否运行 → 代理是否开启 → IP 是不是不合法的静态住宅 IP → muse2api 可以用。</p>
+      <div class="card" id="guarCard"><span class="spin"></span> 正在核验…</div>
+      <div class="card">
+        <h3>看门狗</h3>
+        <div id="guarWatchdog"></div>
+      </div>
+      <div class="card">
+        <h3>供应商链接</h3>
+        <div id="guarLinks"></div>
+      </div>
+    </section>
+
+    <!-- ============ 账号登录 ============ -->
+    <section class="view" id="view-login">
+      <h2>账号登录</h2>
+      <p class="sub">在面板里登录 muse.ai 并取回 cookie。登录请求经链式中继从同一个出口发出，
+        因此 cookie 的登录 IP 与 muse2api 出图时的出口 IP 一致，不会触发地区/风控。</p>
+      <div class="card">
+        <h3>登录</h3>
+        <div class="row">
+          <input type="email" id="loginEmail" placeholder="muse.ai 邮箱">
+          <input type="password" id="loginPassword" placeholder="密码">
+          <input type="text" id="loginLabel" placeholder="账号标签，例如 muse-jp-02">
+          <button class="btn primary" id="loginStart">开始登录</button>
+        </div>
+        <div class="hint">密码只在本机内存中使用，不落盘、不写日志。
+          <label class="sw" style="margin-left:14px">
+            <input type="checkbox" id="loginRevealToggle"> 显示完整 cookie 值
+          </label>
+        </div>
+      </div>
+      <div class="card" id="loginStateCard"><span class="spin"></span> 正在读取状态…</div>
+      <div class="card" id="loginOtpCard" style="display:none">
+        <h3>邮箱验证码</h3>
+        <div class="row">
+          <input type="text" id="loginOtp" placeholder="输入收到的验证码">
+          <button class="btn primary" id="loginOtpSubmit">提交验证码</button>
+        </div>
+      </div>
+      <div class="card" id="loginSessionsCard" style="display:none">
+        <h3>登录会话</h3>
+        <div id="loginSessionsBody"></div>
+      </div>
+      <div class="card" id="loginPoolCard" style="display:none">
+        <h3>muse2api 账号池</h3>
+        <div id="loginPoolBody"></div>
+      </div>
+    </section>
+
+    <!-- ============ 选点目录 ============ -->
+    <section class="view" id="view-catalog">
+      <h2>选点目录</h2>
+      <p class="sub">供应商静态住宅节点清单，按 Muse 地区合规筛选，按价格排序。</p>
+      <div class="card">
+        <div class="row" style="margin-bottom:12px">
+          <label class="sw"><input type="checkbox" id="onlyEligible" checked> 只看 Muse 合规地区</label>
+          <button class="btn" id="reloadCatalog">重新抓取</button>
+          <span id="catalogMeta" style="color:var(--muted);font-size:12px"></span>
+        </div>
+        <div class="scroll"><table id="catalogTable">
+          <thead><tr>
+            <th>国家</th><th>城市</th><th class="mono">价格</th><th>促销</th>
+            <th class="mono">CIDR</th><th>Muse 合规</th>
+          </tr></thead>
+          <tbody><tr><td colspan="6"><span class="spin"></span> 抓取中…</td></tr></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ============ 跳板状态 ============ -->
+    <section class="view" id="view-hop">
+      <h2>跳板状态</h2>
+      <p class="sub">跳板出口与链路三层健康（中继 → 跳板 → 上游静态住宅节点）。</p>
+      <div class="card" id="hopCard"><span class="spin"></span> 正在探测…</div>
+      <div class="card">
+        <h3>为什么不能自动切换节点</h3>
+        <p style="margin:0;color:var(--muted);line-height:1.75;font-size:13px">
+          iKuuu 正在运行的核心实例<b style="color:var(--text)">没有开启 external-controller</b>，
+          节点配置存放在加密的 <code style="font-family:var(--mono)">flutter_secure_storage.dat</code> 中，
+          GUI 的 IPC 端口也不是 HTTP API —— 目前没有任何编程接口能切换 GUI 当前节点。
+          所以这里只做只读检测与建议，实际切换请在 iKuuu 客户端手动操作。
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ 服务控制 ============ -->
+    <section class="view" id="view-service">
+      <h2>服务控制</h2>
+      <p class="sub">muse2api 与链式中继都没有守护进程，升级或重启后需要在这里拉起来。</p>
+      <div class="card" id="svcCard"><span class="spin"></span> 正在读取状态…</div>
+      <div class="card">
+        <h3>部署布局</h3>
+        <div id="layoutBody"><span class="spin"></span> 正在校验…</div>
+      </div>
+      <div class="card">
+        <h3>接入信息与 API Key</h3>
+        <div id="apikeyBody"><span class="spin"></span> 正在读取…</div>
+      </div>
+      <div class="card">
+        <h3>提示</h3>
+        <p style="margin:0;color:var(--muted);line-height:1.75;font-size:13px">
+          「重启」会真正结束当前进程再拉起新进程。muse2api 自身<b style="color:var(--text)">不会自动重启</b>，
+          管理页的「一键在线升级」也会调用 <code style="font-family:var(--mono)">os._exit(0)</code> 结束进程 ——
+          升级后请回到这里点一次「启动」。
+        </p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch (e) { throw new Error('响应不是 JSON: ' + text.slice(0, 160)); }
+  if (!res.ok) throw new Error(data.error || data.message || ('HTTP ' + res.status));
+  return data;
+}
+
+/* ---------- navigation ---------- */
+document.querySelectorAll('#nav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#nav button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    btn.classList.add('active');
+    const view = document.getElementById('view-' + btn.dataset.view);
+    view.classList.add('active');
+    const loaders = { exit: loadExit, guarantee: loadGuarantee, login: refreshLogin,
+                      catalog: loadCatalog, hop: loadHop, service: loadServices };
+    (loaders[btn.dataset.view] || (() => {}))();
+  });
+});
+
+/* ---------- 出口保证 ---------- */
+const CHECK_LABEL = {
+  jump_running: 'iKuuu 核心在运行',
+  jump_alive: 'iKuuu 核心在运行',
+  jump_exit_known: '读得到跳板出口 IP',
+  not_mainland: '跳板出口非中国大陆',
+  system_proxy_on: 'Windows 系统代理已开启',
+  system_proxy_points_to_jump: '系统代理指向跳板端口',
+  relay_alive: '链式中继在监听',
+  upstream_reachable: '上游节点经跳板可达',
+  country_required: '出口国家符合要求',
+  in_muse_regions: '在 Muse 可用地区内',
+  is_static: '出口 IP 静态不轮换',
+  matches_configured_node: '出口等于配置的节点',
+  no_proxy_flag: '未被标记为代理',
+  no_vpn_flag: '未被标记为 VPN',
+  no_tor_flag: '不是 Tor 出口',
+  zero_fraud_score: '欺诈分为 0',
+  zero_proxycheck_risk: 'proxycheck 风险分为 0',
+  not_blacklisted: '未命中黑名单',
+  vendor_has_target_country: '供应商目录有该国静态住宅节点',
+  service_running: 'muse2api 服务在运行',
+  browser_running: '无头浏览器在运行',
+  has_account: '账号池非空',
+  browser_egress_matches: '浏览器实际出口等于目标节点',
+  sessions_healthy: '账号会话校验通过',
+};
+
+function checkChips(checks) {
+  let html = '<div class="health">';
+  Object.keys(checks || {}).forEach(k => {
+    const v = checks[k];
+    const cls = v === true ? 'pass' : (v === false ? 'fail' : 'warn');
+    const mark = v === true ? '✓' : (v === false ? '✗' : '·');
+    html += '<div class="chk ' + cls + '"><b>' + mark + ' ' + esc(CHECK_LABEL[k] || k) +
+      '</b></div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function stepHtml(step, index) {
+  const ok = step.ok;
+  const badge = ok ? '<span class="badge ok">✓ 通过</span>'
+    : '<span class="badge bad">✗ 未通过</span>';
+  let html = '<h3>' + esc(step.name) + '</h3>';
+  html += '<div class="hero"><div style="flex:1;min-width:260px">' + badge +
+    '<div style="margin-top:10px;color:var(--muted);font-size:13px">' +
+    esc(step.subtitle || '') + '</div></div></div>';
+  html += checkChips(step.checks);
+
+  if (step.ip) {
+    html += '<dl class="kv">' +
+      '<dt>出口 IP</dt><dd>' + esc(step.ip) + '</dd>' +
+      '<dt>国家 / 城市</dt><dd>' + esc(step.country_code || '?') + ' / ' + esc(step.city || '?') + '</dd>' +
+      '<dt>目标节点</dt><dd>' + esc(step.node_ip || '?') + '</dd>' +
+      '</dl>';
+  }
+  if (step.system_proxy) {
+    html += '<dl class="kv">' +
+      '<dt>系统代理开关</dt><dd>' + (step.system_proxy.enabled ? '已开启' : '已关闭') + '</dd>' +
+      '<dt>系统代理地址</dt><dd>' + esc(step.system_proxy.server || '（未设置）') + '</dd>' +
+      '<dt>链路</dt><dd>' + esc(step.chain.relay || '') + ' → ' + esc(step.chain.jump || '') +
+      ' → ' + esc(step.chain.upstream || '') + '</dd>' +
+      '</dl>';
+  }
+  if (step.jump_exit && step.jump_exit.exit_ip) {
+    html += '<dl class="kv">' +
+      '<dt>跳板出口</dt><dd>' + esc(step.jump_exit.exit_ip) + '</dd>' +
+      '<dt>跳板地区</dt><dd>' + esc(step.jump_exit.country_code || '?') + ' / ' +
+      esc(step.jump_exit.city || '?') + '</dd>' +
+      '</dl>';
+  }
+  if (step.browser_ip) {
+    html += '<dl class="kv">' +
+      '<dt>浏览器实际出口</dt><dd>' + esc(step.browser_ip) + '</dd>' +
+      '<dt>若不挂代理</dt><dd>' + esc(step.default_ip || '?') + '</dd>' +
+      '<dt>实测对象</dt><dd>' + (step.probe_mode === 'live'
+        ? 'muse2api 正在运行的那个浏览器' : '另起的同配置 Chromium') + '</dd>' +
+      '</dl>';
+  }
+  if (step.static_samples && step.static_samples.length) {
+    html += '<dl class="kv"><dt>静态性采样</dt><dd>' +
+      esc(step.static_samples.join(' / ')) + '</dd></dl>';
+  }
+  if (step.accounts && step.accounts.length) {
+    html += '<div class="scroll" style="margin-top:14px"><table><thead><tr>' +
+      '<th>账号</th><th>启用</th><th>会话</th><th>代理</th><th>有效期</th>' +
+      '</tr></thead><tbody>';
+    step.accounts.forEach(a => {
+      const yn = (v) => v ? '<span class="pill yes">✓</span>' : '<span class="pill no">✗</span>';
+      const sess = a.session_state === 'verified' ? '<span class="pill yes">✓</span>'
+        : a.session_state === 'failed' ? '<span class="pill no">✗</span>'
+        : '<span class="pill idle">· 未验证</span>';
+      html += '<tr><td>' + esc(a.label) + '</td><td>' + yn(a.enabled) + '</td>' +
+        '<td>' + sess + '</td>' +
+        '<td class="mono">' + esc(a.proxy || '—') + '</td>' +
+        '<td class="mono">' + esc(a.expires_at ? new Date(a.expires_at * 1000).toLocaleString() : '—') + '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  (step.problems || []).forEach(p => {
+    html += '<div class="note bad">✗ ' + esc(p) + '</div>';
+  });
+  (step.notes || []).forEach(n => {
+    html += '<div class="note warn">· ' + esc(n) + '</div>';
+  });
+  return html;
+}
+
+function guaranteeHtml(report) {
+  const ok = report.ok;
+  const badge = ok ? '<span class="badge ok">✓ muse2api 可以用</span>'
+    : '<span class="badge bad">✗ 条件不满足</span>';
+  let html = '<div class="hero"><div style="flex:1;min-width:260px">' + badge +
+    '<div style="margin-top:10px;font-size:14px">' + esc(report.headline || '') + '</div>' +
+    '<div style="margin-top:10px;color:var(--muted);font-size:12.5px">核验于 ' +
+    esc(new Date((report.checked_at || 0) * 1000).toLocaleString()) +
+    ' · 耗时 ' + esc(report.duration_ms || 0) + ' ms</div></div>' +
+    '<div style="min-width:190px">' +
+    (report.enforced && report.enforced.length
+      ? report.enforced.map(e => '<div class="note bad">已停用账号 ' + esc(e.label) +
+        '：' + esc(e.reason) + '</div>').join('')
+      : '') +
+    '</div></div>';
+
+  (report.steps || []).forEach((s, i) => { html += stepHtml(s, i); });
+  return html;
+}
+
+function watchdogHtml(snap) {
+  if (!snap) return '';
+  let html = '<dl class="kv">' +
+    '<dt>看门狗</dt><dd>' + (snap.running ? '运行中' : '未运行') + '</dd>' +
+    '<dt>复检周期</dt><dd>' + esc(Math.round((snap.interval || 0) / 60)) + ' 分钟</dd>' +
+    '</dl>';
+  const hist = snap.history || [];
+  if (!hist.length) {
+    html += '<div class="note">还没有复检记录，等待第一轮完成…</div>';
+    return html;
+  }
+  html += '<div class="scroll" style="margin-top:12px"><table><thead><tr>' +
+    '<th>时间</th><th>结论</th><th>说明</th><th>处置</th></tr></thead><tbody>';
+  hist.forEach(h => {
+    html += '<tr><td class="mono">' +
+      esc(new Date((h.checked_at || 0) * 1000).toLocaleString()) + '</td>' +
+      '<td>' + (h.ok ? '<span class="pill yes">可用</span>'
+                     : '<span class="pill no">不满足</span>') + '</td>' +
+      '<td>' + esc((h.problems || []).join('；') || '全部通过') + '</td>' +
+      '<td>' + esc((h.enforced || []).map(e => '停用 ' + e.label).join('；') || '—') +
+      '</td></tr>';
+  });
+  html += '</tbody></table></div>';
+  return html;
+}
+
+function linksHtml(links) {
+  if (!links || !links.length) return '';
+  let html = '<div class="row" style="flex-wrap:wrap;gap:10px">';
+  links.forEach(l => {
+    html += '<a class="btn" href="' + esc(l.url) + '" target="_blank" rel="noopener">' +
+      esc(l.label) + ' ↗</a>';
+  });
+  html += '</div>';
+  return html;
+}
+
+async function loadGuarantee() {
+  const card = $('#guarCard');
+  const wd = $('#guarWatchdog');
+  const links = $('#guarLinks');
+  card.innerHTML = '<span class="spin"></span> 正在核验（会实测浏览器出口，约 20 秒）…';
+  try {
+    const report = await api('/api/guarantee/check', { method: 'POST' });
+    card.innerHTML = guaranteeHtml(report);
+    links.innerHTML = linksHtml(report.vendor_links);
+  } catch (e) {
+    card.innerHTML = '<div class="err">核验失败：' + esc(e.message) + '</div>';
+    links.innerHTML = '';
+  }
+  try {
+    const snap = await api('/api/guarantee');
+    wd.innerHTML = watchdogHtml(snap);
+  } catch (e) {
+    wd.innerHTML = '<div class="err">看门狗状态读取失败：' + esc(e.message) + '</div>';
+  }
+}
+
+/* ---------- 账号登录 ---------- */
+const ESSENTIAL_COOKIES = ['hatch_sess'];
+let loginTimer = null;
+let revealCookies = false;
+
+function maskValue(v) {
+  const s = String(v == null ? '' : v);
+  if (s.length <= 10) return s ? s.slice(0, 2) + '***' : '(空)';
+  return s.slice(0, 4) + '…' + s.slice(-4) + '（' + s.length + ' 字符）';
+}
+
+function loginStateHtml(d) {
+  return '<div class="note">' + esc(d.stage || '') + '</div>';
+}
+
+function sessionHtml(d) {
+  const badgeMap = {
+    idle: '<span class="badge idle">— 未开始</span>',
+    running: '<span class="badge warn">● 进行中</span>',
+    need_otp: '<span class="badge warn">● 等待验证码</span>',
+    done: '<span class="badge ok">✓ 完成</span>',
+    failed: '<span class="badge bad">✗ 失败</span>',
+  };
+  let html = '<div class="svc" style="align-items:flex-start;flex-direction:column;gap:10px">' +
+    '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">' +
+    '<b style="font-size:14px">' + esc(d.label || '(未命名)') + '</b>' +
+    (badgeMap[d.state] || badgeMap.idle) +
+    '<span style="color:var(--muted);font-size:12.5px">' + esc(d.email || '') + '</span>' +
+    (d.imported ? '<span class="pill yes">已导入账号池</span>' : '') +
+    '</div>' +
+    '<div style="color:var(--muted);font-size:13px">' + esc(d.stage || '') + '</div>';
+
+  if (d.error) {
+    html += '<div class="note bad">✗ ' + esc(d.error) + '</div>';
+  }
+
+  // 每个账号一套 cookie
+  const names = d.cookie_names || [];
+  if (names.length) {
+    const expires = d.expires || {};
+    html += '<div class="scroll" style="max-height:220px"><table><thead><tr>' +
+      '<th>Cookie</th><th>关键</th><th>过期</th><th>值</th>' +
+      '</tr></thead><tbody>';
+    names.forEach(n => {
+      const key = ESSENTIAL_COOKIES.includes(n);
+      const exp = expires[n];
+      html += '<tr><td class="mono">' + esc(n) + '</td>' +
+        '<td>' + (key ? '<span class="pill yes">必需</span>'
+                       : '<span class="pill idle">可选</span>') + '</td>' +
+        '<td class="mono">' + (exp ? esc(new Date(exp * 1000).toLocaleString()) : '—') + '</td>' +
+        '<td class="mono" data-cookie="' + esc(n) + '">…</td></tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+
+  if (d.steps && d.steps.length) {
+    html += '<div style="color:var(--muted);font-size:12px">' +
+      d.steps.slice(-4).map(s => esc(new Date((s.at || 0) * 1000).toLocaleTimeString()) +
+        ' ' + esc(s.message)).join(' · ') + '</div>';
+  }
+
+  if (names.length && d.state === 'done') {
+    html += '<div class="row" style="flex-wrap:wrap">' +
+      '<button class="btn" data-act="copy" data-sid="' + esc(d.id) + '">复制 cookie 字符串</button>' +
+      '<button class="btn primary" data-act="import" data-sid="' + esc(d.id) + '">导入账号池</button>' +
+      '<span style="color:var(--muted);font-size:12px" data-msg="' + esc(d.id) + '"></span>' +
+      '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function poolHtml(accounts) {
+  if (!accounts || !accounts.length) {
+    return '<div class="note">账号池还是空的。</div>';
+  }
+  let html = '<div class="scroll"><table><thead><tr>' +
+    '<th>账号</th><th>启用</th><th>会话</th><th>代理</th><th>Cookie</th><th>有效期</th>' +
+    '</tr></thead><tbody>';
+  accounts.forEach(a => {
+    const yn = (v) => v ? '<span class="pill yes">✓</span>' : '<span class="pill no">✗</span>';
+    const sess = a.ok === true ? '<span class="pill yes">✓</span>'
+      : a.ok === false ? '<span class="pill no">✗</span>'
+      : '<span class="pill idle">· 未验证</span>';
+    html += '<tr><td>' + esc(a.label) + '</td>' +
+      '<td>' + yn(a.enabled) + '</td>' +
+      '<td>' + sess + '</td>' +
+      '<td class="mono">' + esc(a.proxy || '—') + '</td>' +
+      '<td class="mono">' + (a.has_essential
+        ? '<span class="pill yes">' + esc(a.cookie_count) + ' 个（含 hatch_sess）</span>'
+        : '<span class="pill no">缺 hatch_sess</span>') + '</td>' +
+      '<td class="mono">' + (a.expires_at
+        ? esc(new Date(a.expires_at * 1000).toLocaleString()) : '—') + '</td></tr>';
+  });
+  html += '</tbody></table></div>';
+  return html;
+}
+
+async function refreshLogin() {
+  const card = $('#loginStateCard');
+  const otpCard = $('#loginOtpCard');
+  const sessionsCard = $('#loginSessionsCard');
+  const poolCard = $('#loginPoolCard');
+  try {
+    const d = await api('/api/login/status?reveal=1');
+    const sessions = d.sessions || [];
+    card.innerHTML = sessions.length
+      ? '<div class="note">当前有 ' + sessions.length +
+        ' 个登录会话。上面填好邮箱密码点「开始登录」可再加一个账号——每个账号会拿到自己的一套 cookie。</div>'
+      : '<div class="note">还没有登录会话。填好上面的邮箱和密码，点「开始登录」。' +
+        '登录请求会经链式中继从同一个出口发出，cookie 与出图时的出口 IP 一致。</div>';
+
+    otpCard.style.display = '';
+    otpCard.innerHTML = '<h3>邮箱验证码</h3>';
+    let needOtp = false;
+    sessions.forEach(s => {
+      if (!s.otp_needed) return;
+      needOtp = true;
+      otpCard.innerHTML += '<div class="row" style="margin-bottom:10px">' +
+        '<span style="color:var(--muted);font-size:12.5px;min-width:120px">' +
+        esc(s.label) + '</span>' +
+        '<input type="text" data-otp-for="' + esc(s.id) + '" placeholder="输入收到的验证码">' +
+        '<button class="btn primary" data-act="otp" data-sid="' + esc(s.id) + '">提交验证码</button>' +
+        '</div>';
+    });
+    otpCard.style.display = needOtp ? '' : 'none';
+
+    sessionsCard.style.display = sessions.length ? '' : 'none';
+    sessionsCard.innerHTML = '<h3>登录会话</h3>' +
+      sessions.map(sessionHtml).join('');
+
+    // fill the cookie values (masked unless the user asked to reveal them)
+    const allCookies = {};
+    sessions.forEach(s => { if (s.cookies) Object.assign(allCookies, s.cookies); });
+    sessionsCard.querySelectorAll('[data-cookie]').forEach(cell => {
+      const name = cell.getAttribute('data-cookie');
+      const raw = allCookies[name] || '';
+      cell.textContent = revealCookies ? raw : maskValue(raw);
+    });
+
+    sessionsCard.querySelectorAll('[data-act]').forEach(btn => {
+      btn.onclick = async () => {
+        const sid = btn.getAttribute('data-sid');
+        const act = btn.getAttribute('data-act');
+        const msg = sessionsCard.querySelector('[data-msg="' + sid + '"]');
+        if (act === 'copy') {
+          const full = await api('/api/login/status?reveal=1');
+          const target = (full.sessions || []).find(s => s.id === sid);
+          const text = (target && target.cookie_string) || '';
+          try {
+            await navigator.clipboard.writeText(text);
+            if (msg) msg.textContent = '已复制 ' + text.length + ' 字符';
+          } catch (e) {
+            if (msg) msg.textContent = '复制失败，请手动选中';
+          }
+        } else if (act === 'import') {
+          const r = await api('/api/login/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sid }),
+          });
+          if (msg) msg.textContent = r.ok
+            ? '已导入：' + (r.label || '') : '导入失败：' + (r.message || '');
+          refreshLogin();
+        }
+      };
+    });
+
+    sessionsCard.querySelectorAll('[data-act="otp"]').forEach(btn => {
+      btn.onclick = async () => {
+        const sid = btn.getAttribute('data-sid');
+        const input = sessionsCard.ownerDocument.querySelector(
+          '[data-otp-for="' + sid + '"]');
+        const code = input ? input.value.trim() : '';
+        await api('/api/login/otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: code, session_id: sid }),
+        });
+        if (input) input.value = '';
+      };
+    });
+
+    const pool = await api('/api/login/pool');
+    poolCard.style.display = '';
+    poolCard.innerHTML = '<h3>muse2api 账号池</h3>' + poolHtml(pool.accounts);
+  } catch (e) {
+    card.innerHTML = '<div class="err">读取状态失败：' + esc(e.message) + '</div>';
+  }
+}
+
+function startLoginPolling() {
+  if (loginTimer) clearInterval(loginTimer);
+  loginTimer = setInterval(refreshLogin, 1500);
+  refreshLogin();
+}
+
+$('#loginStart').addEventListener('click', async () => {
+  const email = $('#loginEmail').value.trim();
+  const password = $('#loginPassword').value;
+  const label = $('#loginLabel').value.trim();
+  $('#loginStateCard').innerHTML = '<span class="spin"></span> 正在启动…';
+  try {
+    const r = await api('/api/login/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, password: password, label: label }),
+    });
+    if (!r.ok) {
+      $('#loginStateCard').innerHTML = '<div class="note bad">✗ ' + esc(r.message) + '</div>';
+      return;
+    }
+    startLoginPolling();
+  } catch (e) {
+    $('#loginStateCard').innerHTML = '<div class="err">启动失败：' + esc(e.message) + '</div>';
+  }
+});
+
+$('#loginOtpSubmit') && $('#loginOtpSubmit').addEventListener('click', async () => {
+  const code = $('#loginOtp').value.trim();
+  await api('/api/login/otp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: code }),
+  });
+  $('#loginOtp').value = '';
+});
+
+$('#loginRevealToggle').addEventListener('change', (e) => {
+  revealCookies = e.target.checked;
+  refreshLogin();
+});
+
+/* ---------- 出口合规 ---------- */
+function verdictBadge(v) {
+  if (v === 'compliant') return '<span class="badge ok">✓ 合规</span>';
+  if (v === 'risky') return '<span class="badge warn">⚠ 有风险</span>';
+  if (v === 'not_eligible') return '<span class="badge bad">✗ 地区不可用</span>';
+  return '<span class="badge idle">— 未知</span>';
+}
+
+function riskTable(risk) {
+  const rows = [];
+  const iw = risk.ipwhois;
+  rows.push(['ipwho.is', iw
+    ? (iw.asn ? ('ASN ' + iw.asn + ' · ' + (iw.org || '-')) : '已连接') +
+      (iw.timezone ? (' · ' + iw.timezone) : '')
+    : '未取到']);
+  const pc = risk.proxycheck;
+  rows.push(['proxycheck.io',
+    pc ? ('proxy=' + pc.proxy + ' · vpn=' + pc.vpn + ' · type=' + (pc.type || '-') +
+          ' · risk=' + pc.risk + ' · fraud=' + (pc.fraud_score === null ? '-' : pc.fraud_score))
+       : '未取到（该源探测失败）']);
+  const ia = risk.ipapi;
+  rows.push(['ip-api.com',
+    ia ? ('hosting=' + ia.hosting + ' · proxy=' + ia.proxy + ' · mobile=' + ia.mobile)
+       : '未取到']);
+  const sc = risk.scamalytics;
+  rows.push(['scamalytics.com', sc ? ('欺诈分 ' + sc.fraud_score) : '未取到']);
+  const bl = risk.blocklist;
+  rows.push(['blocklist.de', bl ? (bl.hits + ' 条拉黑记录') : '未取到']);
+  return '<table><thead><tr><th>数据源</th><th>结果</th></tr></thead><tbody>' +
+    rows.map(r => '<tr><td>' + esc(r[0]) + '</td><td class="mono">' + esc(r[1]) + '</td></tr>').join('') +
+    '</tbody></table>';
+}
+
+function exitCardHtml(d) {
+  if (d.error) return '<div class="err">检测失败：' + esc(d.error) + '</div>';
+  const badge = verdictBadge(d.verdict);
+  const cls = d.verdict === 'compliant' ? 'ok' : (d.verdict === 'risky' ? 'warn' : 'bad');
+  let html = '<div class="hero"><div style="flex:1;min-width:260px">' +
+    '<div class="ip">' + esc(d.ip) + '</div>' +
+    '<div class="ip-sub">' + esc(d.country_code || '?') + ' · ' + esc(d.city || '-') +
+    ' · ' + esc(d.org || '-') + (d.timezone ? ' · ' + esc(d.timezone) : '') + '</div>' +
+    '<div style="margin-top:14px">' + badge +
+    '<div style="margin-top:10px;color:var(--muted);font-size:13px">' + esc(d.headline || '') + '</div></div>' +
+    '</div><div style="text-align:center"><div class="score">' + esc(d.score) +
+    '<small>RISK SCORE</small></div></div></div>';
+  html += '<div style="margin-top:18px">' + riskTable(d.risk || {}) + '</div>';
+  if (d.reasons && d.reasons.length) {
+    html += '<div class="note warn">风险项：' + d.reasons.map(esc).join('、') + '</div>';
+  }
+  if (d.notes && d.notes.length) {
+    html += '<div class="note">提示：' + d.notes.map(esc).join('；') + '</div>';
+  }
+  return html;
+}
+
+async function loadExit() {
+  const card = $('#exitCard');
+  const staticCard = $('#staticCard');
+  const safetyCard = $('#safetyCard');
+  card.innerHTML = '<span class="spin"></span> 正在检测出口…';
+  staticCard.innerHTML = '<span class="spin"></span> 正在校验静态出口…';
+  safetyCard.innerHTML = '<span class="spin"></span> 正在评估 muse2api 安全性…';
+  try {
+    const d = await api('/api/exit');
+    card.innerHTML = exitCardHtml(d);
+    staticCard.innerHTML = staticExitHtml(d.static_exit);
+    safetyCard.innerHTML = museSafetyHtml(d.muse2api);
+  } catch (e) {
+    card.innerHTML = '<div class="err">检测失败：' + esc(e.message) + '</div>';
+    staticCard.innerHTML = '';
+    safetyCard.innerHTML = '';
+  }
+}
+
+/* ---------- 静态海外出口校验 ---------- */
+function staticExitHtml(s) {
+  if (!s) return '';
+  const chip = (cls, label, value) =>
+    '<div class="chk ' + cls + '"><b>' + label + '</b><span class="k">' + esc(value) + '</span></div>';
+  let html = '<h3>静态海外 IP 校验（要求：静态 + 海外 + ' + esc(s.required_country) + '）</h3>';
+  html += '<div class="health">';
+  html += chip(s.is_static ? 'pass' : 'fail', s.is_static ? '✓ 静态' : '✗ 非静态',
+    s.sample_rounds + ' 次采样：' + ((s.unique || []).join(' / ') || '无'));
+  html += chip(s.is_overseas ? 'pass' : 'fail', s.is_overseas ? '✓ 海外' : '✗ 非海外',
+    s.country_code || '未知');
+  html += chip(s.country_ok ? 'pass' : 'fail', s.country_ok ? '✓ 国家合规' : '✗ 国家不符',
+    '需 ' + esc(s.required_country) + ' / 当前 ' + esc(s.country_code || '未知'));
+  if (s.configured_node) {
+    html += chip(s.matches_configured_node ? 'pass' : 'warn',
+      s.matches_configured_node ? '✓ 节点一致' : '⚠ 节点不一致', s.configured_node);
+  }
+  html += '</div>';
+  if (s.reasons && s.reasons.length) {
+    html += '<div class="note bad">不合规：' + s.reasons.map(esc).join('；') + '</div>';
+  } else {
+    html += '<div class="note">出口为静态海外 IP，符合部署要求。</div>';
+  }
+  return html;
+}
+
+/* ---------- muse2api 安全性 ---------- */
+function museSafetyHtml(m) {
+  if (!m) return '';
+  const badge = m.verdict === 'safe' ? '<span class="badge ok">✓ 安全</span>'
+    : m.verdict === 'warn' ? '<span class="badge warn">⚠ 有提示</span>'
+    : '<span class="badge bad">✗ 不安全</span>';
+  let html = '<h3>muse2api 安全性判定</h3>';
+  html += '<div class="hero"><div style="flex:1;min-width:260px">' + badge +
+    '<div style="margin-top:10px;color:var(--muted);font-size:13px">' + esc(m.headline || '') + '</div>' +
+    '<div style="margin-top:10px;color:var(--muted);font-size:12.5px">出口 ' +
+    esc(m.exit_ip || '未知') + ' · 服务 ' + (m.service_running ? '运行中' : '未运行') +
+    ' · 浏览器 ' + (m.browser_running ? '运行中' : '未运行') + '</div>' +
+    '</div></div>';
+
+  if (m.accounts && m.accounts.length) {
+    html += '<div class="scroll" style="margin-top:16px"><table><thead><tr>' +
+      '<th>账号</th><th>会话</th><th>Cookie</th><th>代理</th><th>出口一致</th>' +
+      '<th>周额度</th><th>剩余</th><th>结论</th></tr></thead><tbody>';
+    m.accounts.forEach(a => {
+      const c = a.checks || {};
+      const yn = (v) => v ? '<span class="pill yes">✓</span>' : '<span class="pill no">✗</span>';
+      const left = a.session_left_seconds
+        ? (a.session_left_seconds / 3600).toFixed(1) + ' 小时' : '—';
+      html += '<tr><td>' + esc(a.label) + '</td>' +
+        '<td>' + yn(c.session_ok && c.session_valid) + '</td>' +
+        '<td>' + yn(c.essential_cookies) + '</td>' +
+        '<td>' + yn(c.proxy_configured && c.proxy_reachable) + '</td>' +
+        '<td>' + yn(c.exit_ip_match) + '</td>' +
+        '<td class="mono">' + esc(a.weekly_used_pct == null ? '—' : a.weekly_used_pct + '%') + '</td>' +
+        '<td class="mono">' + esc(left) + '</td>' +
+        '<td>' + (a.ok ? '<span class="pill yes">正常</span>'
+                       : '<span class="pill no">' + esc((a.issues || []).join('、')) + '</span>') +
+        '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  if (m.confirmations && m.confirmations.length) {
+    html += '<div class="note">确认项：' + m.confirmations.map(esc).join('；') + '</div>';
+  }
+  if (m.notes && m.notes.length) {
+    html += '<div class="note warn">提示：' + m.notes.map(esc).join('；') + '</div>';
+  }
+  if (m.issues && m.issues.length) {
+    html += '<div class="note bad">问题：' + m.issues.map(esc).join('；') + '</div>';
+  }
+  return html;
+}
+
+$('#probeBtn').addEventListener('click', async () => {
+  const ip = $('#probeIp').value.trim();
+  const out = $('#probeResult');
+  if (!ip) { out.innerHTML = '<div class="err">请输入 IP</div>'; return; }
+  out.innerHTML = '<span class="spin"></span> 检测中…';
+  try {
+    const d = await api('/api/exit?ip=' + encodeURIComponent(ip));
+    out.innerHTML = '<div style="margin-top:16px">' + exitCardHtml(d) + '</div>';
+  } catch (e) {
+    out.innerHTML = '<div class="err">检测失败：' + esc(e.message) + '</div>';
+  }
+});
+$('#probeClear').addEventListener('click', () => {
+  $('#probeIp').value = ''; $('#probeResult').innerHTML = '';
+});
+
+/* ---------- 选点目录 ---------- */
+async function loadCatalog() {
+  const body = $('#catalogTable tbody');
+  body.innerHTML = '<tr><td colspan="6"><span class="spin"></span> 抓取中…</td></tr>';
+  try {
+    const d = await api('/api/catalog');
+    if (d.error) {
+      body.innerHTML = '<tr><td colspan="6" class="err">抓取失败：' + esc(d.error) + '</td></tr>';
+      return;
+    }
+    $('#catalogMeta').textContent =
+      '共 ' + d.total + ' 个节点 · ' + d.eligible_count + ' 个合规 · ' +
+      new Date(d.fetched_at * 1000).toLocaleString();
+    window.__catalog = d;
+    renderCatalog(d);
+  } catch (e) {
+    body.innerHTML = '<tr><td colspan="6" class="err">抓取失败：' + esc(e.message) + '</td></tr>';
+  }
+}
+
+function renderCatalog(d) {
+  const onlyEligible = $('#onlyEligible').checked;
+  const cur = d.current || {};
+  const rows = d.nodes.filter(n => !onlyEligible || n.muse_ok);
+  $('#catalogTable tbody').innerHTML = rows.map(n => {
+    // Match on country: the catalogue lists cities in Chinese while the geo
+    // sources answer in English, so city-level comparison is unreliable.
+    const sameCountry = cur.country_code && cur.country_code === n.country;
+    const tag = sameCountry
+      ? ' <span class="pill yes">当前 ' + esc(cur.ip || '') + '</span>' : '';
+    return '<tr' + (sameCountry ? ' class="current"' : '') + '>' +
+      '<td>' + esc(n.country) + ' <span style="color:var(--muted)">' + esc(n.country_name) + '</span></td>' +
+      '<td>' + esc(n.city) + tag + '</td>' +
+      '<td class="mono">$' + esc(n.price) + '</td>' +
+      '<td>' + (n.special ? '<span class="pill promo">促销</span>' : '<span style="color:var(--muted)">—</span>') + '</td>' +
+      '<td class="mono" style="color:var(--muted)">' + (n.cidr ? esc(n.cidr) : '—') + '</td>' +
+      '<td>' + (n.muse_ok ? '<span class="pill yes">✓ 可用</span>' : '<span class="pill no">✗ 不可用</span>') + '</td>' +
+      '</tr>';
+  }).join('') || '<tr><td colspan="6" style="color:var(--muted)">没有符合条件的节点</td></tr>';
+}
+
+$('#onlyEligible').addEventListener('change', () => {
+  if (window.__catalog) renderCatalog(window.__catalog);
+});
+$('#reloadCatalog').addEventListener('click', loadCatalog);
+
+/* ---------- 跳板 ---------- */
+async function loadHop() {
+  const card = $('#hopCard');
+  card.innerHTML = '<span class="spin"></span> 正在探测…';
+  try {
+    const d = await api('/api/hop');
+    const je = d.jump_exit || {};
+    const cls = d.relay_alive && d.jump_alive ? 'ok' : 'warn';
+    let html = '<div class="hero"><div style="flex:1;min-width:260px">' +
+      '<div class="ip">' + esc(je.exit_ip || '—') + '</div>' +
+      '<div class="ip-sub">' + esc(je.country_code || '?') + ' · ' + esc(je.city || '-') +
+      ' · ' + esc(je.org || '-') + '</div></div>' +
+      '<div>' + (d.mainland
+        ? '<span class="badge bad">✗ 中国大陆出口</span>'
+        : '<span class="badge ok">✓ 非中国大陆</span>') + '</div></div>';
+    html += '<div class="health">' +
+      '<div class="hstep"><span class="led ' + (d.relay_alive ? 'on' : 'off') + '"></span>链式中继 ' +
+        esc(d.chain.relay) + '</div>' +
+      '<div class="hstep"><span class="led ' + (d.jump_alive ? 'on' : 'off') + '"></span>iKuuu 跳板 ' +
+        esc(d.chain.jump) + '</div>' +
+      '<div class="hstep"><span class="led ' + (d.upstream_reachable ? 'on' : 'off') + '"></span>上游节点 ' +
+        esc(d.chain.upstream) + '</div>' +
+      '</div>';
+    const noteCls = d.relay_alive && d.jump_alive && d.upstream_reachable ? '' : ' warn';
+    html += '<div class="note' + noteCls + '">' + esc(d.recommendation || '') + '</div>';
+    card.innerHTML = html;
+  } catch (e) {
+    card.innerHTML = '<div class="err">探测失败：' + esc(e.message) + '</div>';
+  }
+}
+
+/* ---------- 服务控制 ---------- */
+async function loadServices() {
+  const card = $('#svcCard');
+  card.innerHTML = '<span class="spin"></span> 正在读取状态…';
+  try {
+    const d = await api('/api/status');
+    const s = d.services;
+    card.innerHTML =
+      svcRow('muse2api', 'muse2api 服务', s.muse2api) +
+      svcRow('chain', '链式中继', s.chain) +
+      '<div class="row" style="margin-top:14px"><button class="btn" id="reloadSvc">刷新状态</button></div>';
+    $('#reloadSvc').addEventListener('click', loadServices);
+    bindSvcButtons();
+  } catch (e) {
+    card.innerHTML = '<div class="err">读取失败：' + esc(e.message) + '</div>';
+  }
+  loadApiKey();
+  loadLayout();
+}
+
+/* ---------- 部署布局校验 ---------- */
+async function loadLayout() {
+  const box = $('#layoutBody');
+  try {
+    const d = await api('/api/layout');
+    const yn = (v) => v ? '<span class="pill yes">✓</span>' : '<span class="pill no">✗</span>';
+    let html = '<dl class="kv">' +
+      '<dt>面板目录</dt><dd class="mono">' + esc(d.panel_dir) + '</dd>' +
+      '<dt>muse2api 目录</dt><dd class="mono">' + esc(d.path) + '</dd>' +
+      '<dt>平级放置</dt><dd>' + yn(d.sibling_of_panel) + '</dd>' +
+      '<dt>是 muse2api 部署</dt><dd>' + yn(d.has_app) + '</dd>' +
+      '<dt>有 .env</dt><dd>' + yn(d.has_env) + '</dd>' +
+      '<dt>有账号池</dt><dd>' + yn(d.has_accounts) + '</dd>' +
+      '</dl>';
+    if (!d.ok) {
+      html += '<div class="note bad">✗ 解析到的目录不是可用的 muse2api 部署。' +
+        '面板与 muse2api 必须平级放置（各自目录名等于仓库名），' +
+        '或用 panel.env / 环境变量 MUSE2API_DIR 指定正确路径。</div>';
+    } else {
+      html += '<div class="note">布局保证成立：面板与 muse2api 平级，' +
+        '各自目录名等于仓库名。</div>';
+    }
+    box.innerHTML = html;
+  } catch (e) {
+    box.innerHTML = '<div class="err">校验失败：' + esc(e.message) + '</div>';
+  }
+}
+
+/* ---------- 接入信息与 API Key ---------- */
+let apikeyRevealed = false;
+
+async function loadApiKey() {
+  const box = $('#apikeyBody');
+  try {
+    const d = await api('/api/apikey');
+    if (d.error) {
+      box.innerHTML = '<div class="note bad">✗ ' + esc(d.error) + '</div>';
+      return;
+    }
+    const key = d.api_key || '';
+    const masked = key.length > 12
+      ? key.slice(0, 8) + '…' + key.slice(-4) + '（' + key.length + ' 字符）'
+      : (key || '（未设置）');
+    let html = '<dl class="kv">' +
+      '<dt>Base URL</dt><dd>' + esc(d.base_url || '—') + '</dd>' +
+      '<dt>Models</dt><dd>' + esc(d.models_url || '—') + '</dd>' +
+      '<dt>Media</dt><dd>' + esc(d.media_url || '—') + '</dd>' +
+      '<dt>API Key</dt><dd class="mono">' +
+      esc(apikeyRevealed ? key : masked) + '</dd>' +
+      '</dl>';
+    html += '<div class="row" style="flex-wrap:wrap;margin-top:12px">' +
+      '<button class="btn" id="apikeyReveal">' +
+      (apikeyRevealed ? '隐藏' : '显示完整值') + '</button>' +
+      '<button class="btn" id="apikeyCopy">复制</button>' +
+      '<button class="btn danger" id="apikeyRotate">重新生成</button>' +
+      '<span id="apikeyMsg" style="color:var(--muted);font-size:12px"></span>' +
+      '</div>';
+    html += '<div class="note">管理页（18610）右上角提示「API Key 必填」时，' +
+      '把上面的 Key 粘进去点「保存」即可——浏览器会记住它。</div>';
+    box.innerHTML = html;
+
+    $('#apikeyReveal').onclick = () => { apikeyRevealed = !apikeyRevealed; loadApiKey(); };
+    $('#apikeyCopy').onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(key);
+        $('#apikeyMsg').textContent = '已复制';
+      } catch (e) {
+        $('#apikeyMsg').textContent = '复制失败，请手动选中';
+      }
+    };
+    $('#apikeyRotate').onclick = async () => {
+      if (!confirm('重新生成 API Key？\n\n旧 Key 会立即失效，' +
+                   '已经接入的下游项目必须同步更新，否则会报 401。')) return;
+      const r = await api('/api/apikey/rotate', { method: 'POST' });
+      $('#apikeyMsg').textContent = r.ok
+        ? '已生成新 Key（面板已自动切换，旧 Key 已失效）'
+        : '生成失败：' + (r.message || r.error || '未知错误');
+      apikeyRevealed = true;
+      loadApiKey();
+    };
+  } catch (e) {
+    box.innerHTML = '<div class="err">读取失败：' + esc(e.message) + '</div>';
+  }
+}
+
+function svcRow(target, label, st) {
+  const on = !!st.running;
+  return '<div class="svc">' +
+    '<span class="led ' + (on ? 'on' : 'off') + '"></span>' +
+    '<span class="svc-name">' + esc(label) + '</span>' +
+    '<span class="svc-meta">端口 ' + esc(st.port) + ' · PID ' + (st.pid || '-') +
+      (st.started_at ? ' · 启动于 ' + esc(st.started_at) : '') + '</span>' +
+    '<button class="btn" data-svc="' + target + '" data-act="start"' + (on ? ' disabled' : '') + '>启动</button>' +
+    '<button class="btn" data-svc="' + target + '" data-act="restart"' + (on ? '' : ' disabled') + '>重启</button>' +
+    '<button class="btn danger" data-svc="' + target + '" data-act="stop"' + (on ? '' : ' disabled') + '>停止</button>' +
+    '</div>';
+}
+
+function bindSvcButtons() {
+  document.querySelectorAll('[data-svc]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const target = btn.dataset.svc, act = btn.dataset.act;
+      btn.disabled = true;
+      const old = btn.textContent;
+      btn.innerHTML = '<span class="spin"></span>';
+      try {
+        const r = await api('/api/service/' + target + '/' + act, { method: 'POST' });
+        if (!r.ok) alert('操作失败：' + (r.message || r.error || '未知错误'));
+        else if (r.message) console.log('[panel]', target, act, r.message);
+      } catch (e) {
+        alert('操作失败：' + e.message);
+      }
+      btn.disabled = false;
+      btn.textContent = old;
+      loadServices();
+    });
+  });
+}
+
+/* ---------- boot ---------- */
+$('#regions').textContent = 'US / CA / JP / SG / MX / AU';
+loadExit();
+</script>
+</body>
+</html>
