@@ -78,9 +78,27 @@ def _is_placeholder(value):
     return False
 
 
+def _secret_files():
+    """Every file that may hold credentials, not just the fixed list.
+
+    New services bring their own .env, so a fixed path list would miss
+    them - a key staged from services/<name>/.env has to be caught too.
+    """
+    files = list(SECRET_FILES)
+    for root, dirs, names in os.walk(ROOT):
+        dirs[:] = [d for d in dirs
+                   if d not in (".git", "__pycache__", "node_modules", ".pytest_cache")]
+        for name in names:
+            if name == ".env" or name.endswith(".env"):
+                rel = os.path.relpath(os.path.join(root, name), ROOT)
+                if rel not in files:
+                    files.append(rel)
+    return files
+
+
 def load_secrets():
     secrets = []
-    for rel in SECRET_FILES:
+    for rel in _secret_files():
         path = os.path.join(ROOT, rel)
         if not os.path.isfile(path):
             continue

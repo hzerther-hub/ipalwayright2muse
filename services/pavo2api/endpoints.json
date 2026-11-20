@@ -1,0 +1,244 @@
+{
+  "site": "https://app.pavo-ai.cn/",
+  "api_host": "https://api.pavo-ai.cn",
+  "api_base": "https://api.pavo-ai.cn/api",
+  "_base_note": "前端 NEXT_PUBLIC_API_URL = https://api.pavo-ai.cn/api —— 前面还有一层 /api 前缀，漏了会得到 code 000201 Resource not found。",
+  "regions": [
+    "cn",
+    "intl"
+  ],
+  "note": "内部接口清单，由 tools/_probe_pavo.py 从 Next.js chunk 里扒出。路径为相对 API_BASE 的路径。",
+  "public_endpoints": {
+    "_note": "无需登录即可调用（实测 code=000000）",
+    "models": "GET /v1/pixa/models",
+    "model_capability_spec": "GET /v1/aigc/model-capability-spec?model_code=<code>",
+    "support_modes": "GET /v1/pixa/support_modes"
+  },
+  "auth_required": {
+    "_note": "无 token 时返回 code=000501 Login expired",
+    "login": "POST /v1/user/login",
+    "register": "POST /v1/user/register",
+    "phone_otp": "POST /v1/user/auth/phone-otp",
+    "send_code": "POST /v1/user/code/send",
+    "captcha_status": "GET /v1/user/captcha/status",
+    "auth_methods": "GET /v1/user/auth_methods",
+    "bind_phone": "POST /v1/user/bind_phone",
+    "bind_wechat": "POST /v1/user/bind_wechat",
+    "reset_password": "POST /v1/user/reset_password",
+    "influencer_invite_bind": "POST /v1/user/influencer-invite/bind",
+    "account": "GET /v1/user/account",
+    "profile": "GET /v1/user/profile",
+    "avatar_presigned": "GET /v1/user/avatar/presigned-url"
+  },
+  "credits": {
+    "estimate": "POST /v1/aigc/credits/estimate",
+    "calculate": "POST /v1/aigc/credits/calculate",
+    "voice_generate_credits": "POST /v1/pixa/short-drama/voices/generate/credits"
+  },
+  "catalog": {
+    "mode_support_models": "GET /v1/pixa/mode_support_models",
+    "general_library": "GET /v1/pixa/general-library",
+    "styles": "GET /v1/pixa/short-drama/styles",
+    "voices": "GET /v1/pixa/short-drama/voices"
+  },
+  "generation": {
+    "projects_ai_generate": "POST /v1/pixa/short-drama/projects/ai-generate",
+    "projects_create": "POST /v1/pixa/short-drama/projects/",
+    "projects_upload": "POST /v1/pixa/short-drama/projects/upload",
+    "projects_paste": "POST /v1/pixa/short-drama/projects/paste",
+    "projects_batch_delete": "POST /v1/pixa/short-drama/projects/batch-delete",
+    "episodes_create": "POST /v1/pixa/short-drama/episodes/",
+    "episodes_batch_storyboard_generate": "POST /v1/pixa/short-drama/episodes/batch/storyboard/generate",
+    "segments": "GET /v1/pixa/short-drama/segments/",
+    "segments_batch_video_generate": "POST /v1/pixa/short-drama/segments/batch/video/generate",
+    "segments_batch_keyframe_generate": "POST /v1/pixa/short-drama/segments/batch/keyframe/generate",
+    "segments_reorder": "POST /v1/pixa/short-drama/segments/reorder",
+    "shots": "GET /v1/pixa/short-drama/shots",
+    "shots_detail": "GET /v1/pixa/short-drama/shots/",
+    "storyboard_generate": "POST /v1/pixa/short-drama/storyboard/generate",
+    "storyboard_detail": "GET /v1/pixa/short-drama/storyboard/detail",
+    "art_batch_generate_image": "POST /v1/pixa/short-drama/art/batch-generate-image",
+    "art_cancel_generate_image": "POST /v1/pixa/short-drama/art/cancel-generate-image",
+    "art_character_generate_cover": "POST /v1/pixa/short-drama/art/characters/generate-cover",
+    "art_character_generate_fourview": "POST /v1/pixa/short-drama/art/characters/generate-fourview",
+    "art_expand_description": "POST /v1/pixa/short-drama/art/expand-description",
+    "art_props_generate_image": "POST /v1/pixa/short-drama/art/props/generate-image",
+    "art_scenes_generate_image": "POST /v1/pixa/short-drama/art/scenes/generate-image",
+    "art_versions": "GET /v1/pixa/short-drama/art/art-versions",
+    "voice_generate": "POST /v1/pixa/short-drama/voices/generate",
+    "tasks": "GET /v1/pixa/short-drama/tasks/",
+    "export": "POST /v1/pixa/short-drama/export",
+    "canvas": "GET /v1/pixa/canvas",
+    "studio_assets_import": "POST /v1/pixa/studio/assets/import"
+  },
+  "media": {
+    "upload": "/media/upload",
+    "watermark": "/v1/media/watermark"
+  },
+  "models": [
+    {
+      "model_code": "agnes-image",
+      "alias": "Agnes Image 2.5 Flash",
+      "type": "image"
+    },
+    {
+      "model_code": "agnes-video-new",
+      "alias": "Agnes Video 2.5",
+      "type": "video"
+    },
+    {
+      "model_code": "gpt-image-2",
+      "alias": "全能图片G2",
+      "type": "image"
+    },
+    {
+      "model_code": "gpt-image-2-5-flare",
+      "alias": "全能图片G2.5 Flare",
+      "type": "image"
+    },
+    {
+      "model_code": "gpt-image-2-5-sunburst",
+      "alias": "全能图片G2.5 Sunburst",
+      "type": "image"
+    },
+    {
+      "model_code": "gpt-image-2-6-flare",
+      "alias": "全能图片模型G2.6 Flare",
+      "type": "image"
+    },
+    {
+      "model_code": "gpt-image-2-6-sunburst",
+      "alias": "全能图片G2.6 Sunburst",
+      "type": "image"
+    },
+    {
+      "model_code": "happyhorse-1-1",
+      "alias": "HappyHorse 1.1",
+      "type": "video"
+    },
+    {
+      "model_code": "kling-4-0",
+      "alias": "Kling 4.0",
+      "type": "video"
+    },
+    {
+      "model_code": "minimax-music-3-0",
+      "alias": "MiniMax Music 3.0",
+      "type": "audio"
+    },
+    {
+      "model_code": "mj-v8-2",
+      "alias": "影像美学 V8.2",
+      "type": "image"
+    },
+    {
+      "model_code": "nano2",
+      "alias": "NB 2",
+      "type": "image"
+    },
+    {
+      "model_code": "qwen-image-3-pro",
+      "alias": "Qwen Image 3 Pro",
+      "type": "image"
+    },
+    {
+      "model_code": "seedance-2-0",
+      "alias": "Seedance 2.0",
+      "type": "video"
+    },
+    {
+      "model_code": "seedance-2-0-mini",
+      "alias": "Seedance 2.0 Mini",
+      "type": "video"
+    },
+    {
+      "model_code": "seedance-2-5",
+      "alias": "Seedance 2.5",
+      "type": "video"
+    },
+    {
+      "model_code": "seedance-2-5-flash",
+      "alias": "Seedance 2.5 Flash",
+      "type": "video"
+    },
+    {
+      "model_code": "seedream5-0",
+      "alias": "Seedream 5.0 Lite",
+      "type": "image"
+    },
+    {
+      "model_code": "seedream5-0-flash",
+      "alias": "Seedream 5.0 Flash",
+      "type": "image"
+    },
+    {
+      "model_code": "seedream5-0-pro",
+      "alias": "Seedream 5.0 Pro",
+      "type": "image"
+    },
+    {
+      "model_code": "seedream5-5",
+      "alias": "Seedream 5.5",
+      "type": "image"
+    },
+    {
+      "model_code": "wan-3-0",
+      "alias": "Wan 3.0",
+      "type": "video"
+    },
+    {
+      "model_code": "wan-3-0-prime",
+      "alias": "Wan 3.0 Prime",
+      "type": "video"
+    }
+  ],
+  "capability_example": {
+    "model_code": "seedance-2-5",
+    "model_type": "video",
+    "mode_types": [
+      "text_to_video",
+      "first_frame",
+      "first_last_frame",
+      "reference_image",
+      "reference_video",
+      "video_edit",
+      "video_extend"
+    ],
+    "duration_seconds": "4-30",
+    "supported_resolutions": [
+      "sd",
+      "hd",
+      "fhd"
+    ],
+    "resolution_labels": {
+      "sd": "480p",
+      "hd": "720p",
+      "fhd": "1080p"
+    },
+    "aspect_ratios": [
+      "9:16",
+      "3:4",
+      "1:1",
+      "4:3",
+      "16:9",
+      "21:9"
+    ],
+    "max_total_count": 50,
+    "default_resolution": "hd",
+    "input_text_max_length": 15000
+  },
+  "chat": {
+    "_note": "Pavo 也有对话/Agent 模式（首页那个输入框），和 AIGC 平台并存",
+    "conversation": "/v1/chat/conversation",
+    "stream": "/v1/chat/stream",
+    "stream_resume": "/v1/chat/stream/resume",
+    "stream_cancel": "/v1/chat/stream/cancel",
+    "stream_hitl_resume": "/v1/chat/stream/hitl-resume",
+    "agnes_edit_resend": "/v1/agnes/chat/stream/edit-resend"
+  },
+  "file": {
+    "presigned_url": "/v1/file/presigned-url",
+    "inspect": "/v1/file/inspect",
+    "convert_to_markdown": "/v1/file/convert-to-markdown"
+  }
+}

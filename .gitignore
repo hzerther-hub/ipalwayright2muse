@@ -25,3 +25,7 @@ Thumbs.db
 
 # 本机上游注册表（按机器路径定制，不入库）
 upstreams.json
+
+# 各服务自己的密钥文件
+services/*/.env
+services/*/data/

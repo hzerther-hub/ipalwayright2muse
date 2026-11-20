@@ -1,0 +1,228 @@
+# -*- coding: utf-8 -*-
+"""Generate the service scaffolds for the upstreams that are not wired yet.
+
+Each scaffold is a working FastAPI app that already speaks the upstream
+contract (so the panel can manage it) and refuses the chat endpoint with an
+explicit message instead of pretending to work.
+
+Usage:
+    python tools/make_service_scaffold.py
+"""
+from __future__ import annotations
+
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(HERE)
+
+TEMPLATE = '''# -*- coding: utf-8 -*-
+"""{label} —— {site} 的网页版聊天，转成 OpenAI 兼容 API。
+
+状态：**脚手架**。服务与上游契约已通（面板可以接管它），对话接口还没接上。
+
+接入步骤（每次约 10 分钟）：
+  1. 登录 {site} 拿到会话凭据，导入面板的账号池
+  2. python -m web2api.capture --site {site} --pattern "{pattern}" --out {slug}.json
+     在弹出的浏览器里发一条消息，脚本会录下内部请求的形状
+  3. 按录到的形状写 adapter：构造请求、解 SSE、映射成 OpenAI chunk
+
+已知情况：{known}
+"""
+from __future__ import annotations
+
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(os.path.dirname(HERE))
+sys.path.insert(0, REPO)
+sys.path.insert(0, os.path.join(REPO, "web2api"))
+sys.path.insert(0, os.path.join(REPO, "lib"))
+
+from fastapi import Depends, FastAPI, Header, HTTPException  # noqa: E402
+from pydantic import BaseModel, Field  # noqa: E402
+
+from web2api.contract import ContractMixin  # noqa: E402
+
+
+class {cls}(ContractMixin):
+    service_name = "{slug}"
+    models = [{{"id": "{slug}", "object": "model", "owned_by": "{slug}"}}]
+    data_dir = os.path.join(HERE, "data")
+    key_env = "{env}"
+
+
+svc = {cls}()
+app = FastAPI(title="{slug}", version="0.1.0")
+
+
+def auth(authorization: str = Header(default=None)):
+    token = (authorization or "").strip()
+    if token.lower().startswith("bearer "):
+        token = token[7:].strip()
+    if not token or token != svc.api_key():
+        raise HTTPException(401, "API Key 无效或缺失")
+
+
+@app.get("/admin/status")
+def status(_=Depends(auth)):
+    return svc.contract_status()
+
+
+class AccountIn(BaseModel):
+    label: str = ""
+    cookies: dict[str, str] = Field(default_factory=dict)
+    expires: dict[str, int] = Field(default_factory=dict)
+    proxy: dict | None = None
+    token: str = ""
+
+
+@app.post("/admin/accounts")
+def add_account(req: AccountIn, _=Depends(auth)):
+    return svc.contract_add_account(req.label, req.cookies, req.expires,
+                                    req.proxy, req.token)
+
+
+class AccountPatch(BaseModel):
+    label: str | None = None
+    enabled: bool | None = None
+    proxy: dict | None = None
+
+
+@app.patch("/admin/accounts/{{aid}}")
+def patch_account(aid: str, req: AccountPatch, _=Depends(auth)):
+    return svc.contract_patch_account(aid, req.label, req.enabled, req.proxy)
+
+
+@app.delete("/admin/accounts/{{aid}}")
+def del_account(aid: str, _=Depends(auth)):
+    return svc.contract_delete_account(aid)
+
+
+@app.post("/admin/accounts/{{aid}}/proxy/test")
+def test_account_proxy(aid: str, _=Depends(auth)):
+    return svc.contract_proxy_test(aid)
+
+
+@app.post("/admin/accounts/{{aid}}/test")
+def test_account(aid: str, _=Depends(auth)):
+    return svc.contract_probe_account(aid)
+
+
+@app.get("/admin/apikey")
+def get_apikey(_=Depends(auth)):
+    return {{"api_key": svc.api_key(), "base_url": "",
+            "models_url": "/v1/models", "media_url": "/v1/media/{{name}}"}}
+
+
+@app.post("/admin/apikey/rotate")
+def rotate_apikey(_=Depends(auth)):
+    return svc.rotate_key()
+
+
+@app.get("/healthz")
+def healthz():
+    return {{"ok": True}}
+
+
+@app.get("/readyz")
+def readyz():
+    return {{"ok": True, "accounts": len(svc.load_accounts())}}
+
+
+@app.get("/v1/models")
+def models(_=Depends(auth)):
+    return {{"object": "list", "data": svc.models}}
+
+
+class Message(BaseModel):
+    role: str = "user"
+    content: str = ""
+
+
+class ChatRequest(BaseModel):
+    model: str = "{slug}"
+    messages: list[Message] = Field(default_factory=list)
+    stream: bool = False
+
+
+@app.post("/v1/chat/completions")
+def chat_completions(req: ChatRequest, _=Depends(auth)):
+    accounts = [a for a in svc.load_accounts()
+                if a.get("enabled", True) and (a.get("token") or a.get("cookies"))]
+    if not accounts:
+        raise HTTPException(503, "账号池里没有可用会话——先在面板导入 {label} 的账号")
+    raise HTTPException(
+        501,
+        "{label} 的对话链路还没接上。用 web2api/capture.py 抓一次真实请求，"
+        "按录到的形状写 adapter 即可。")
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "{port}")))
+'''
+
+SERVICES = [
+    {
+        "slug": "mistral2api", "cls": "Mistral2api", "label": "Mistral Le Chat",
+        "site": "https://chat.mistral.ai/chat", "pattern": "chat",
+        "env": "MISTRAL2API_KEY", "port": 18613,
+        "known": "页面直取 403（Cloudflare 级防护），必须真浏览器会话",
+    },
+    {
+        "slug": "perplexity2api", "cls": "Perplexity2api", "label": "Perplexity",
+        "site": "https://www.perplexity.ai/", "pattern": "stream|chat|search",
+        "env": "PERPLEXITY2API_KEY", "port": 18614,
+        "known": "页面直取 403（Cloudflare 级防护），必须真浏览器会话；"
+                 "它的回答带引用，映射时要保留 source 列表",
+    },
+    {
+        "slug": "grok2api", "cls": "Grok2api", "label": "Grok",
+        "site": "https://grok.com/", "pattern": "chat|response",
+        "env": "GROK2API_KEY", "port": 18615,
+        "known": "页面直取 403（Cloudflare 级防护），必须真浏览器会话",
+    },
+    {
+        "slug": "qwen2api", "cls": "Qwen2api", "label": "通义千问",
+        "site": "https://chat.qwen.ai/", "pattern": "chat|completion",
+        "env": "QWEN2API_KEY", "port": 18616,
+        "known": "页面能开但接口在懒加载的 chunk 里，需浏览器级抓包",
+    },
+    {
+        "slug": "kimi2api", "cls": "Kimi2api", "label": "Kimi",
+        "site": "https://www.kimi.com/", "pattern": "chat|stream",
+        "env": "KIMI2API_KEY", "port": 18617,
+        "known": "页面能开但接口在懒加载的 chunk 里，需浏览器级抓包",
+    },
+    {
+        "slug": "doubao2api", "cls": "Doubao2api", "label": "豆包",
+        "site": "https://www.doubao.com/chat/", "pattern": "chat|completion",
+        "env": "DOUBAO2API_KEY", "port": 18618,
+        "known": "页面能开但接口在懒加载的 chunk 里，需浏览器级抓包",
+    },
+]
+
+
+def main():
+    base = os.path.join(REPO, "services")
+    for spec in SERVICES:
+        target = os.path.join(base, spec["slug"])
+        os.makedirs(target, exist_ok=True)
+        path = os.path.join(target, "app.py")
+        if os.path.exists(path):
+            print("跳过（已存在）:", spec["slug"])
+            continue
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(TEMPLATE.format(**spec))
+        with open(os.path.join(target, "requirements.txt"), "w",
+                  encoding="utf-8", newline="\n") as f:
+            f.write("fastapi>=0.115\nuvicorn[standard]>=0.32\npydantic>=2.9\n"
+                    "requests>=2.32\n")
+        print("已生成:", spec["slug"], "->", path)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
