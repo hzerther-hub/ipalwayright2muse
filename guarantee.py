@@ -346,7 +346,7 @@ def check_residential_ip():
         "ok": all(checks.values()),
         "subtitle": ("%s · %s/%s · %s 静态住宅节点"
                      % (ipdata.get("ip") or "?", country or "?",
-                        ipdata.get("city") or "?", PROXY_VENDOR),
+                        ipdata.get("city") or "?", PROXY_VENDOR)),
         "checks": checks,
         "ip": ipdata.get("ip"),
         "country_code": country,

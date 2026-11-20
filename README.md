@@ -80,7 +80,8 @@ tools\m2a-panel.cmd smoke  # 冒烟测试
 
 ```ini
 MUSE2API_DIR=E:\muse\muse2api
-REQUIRED_COUNTRY=JP
+# 可选：锁定出口国家（如 JP / US / CA / SG / MX / AU）。留空 = 任意 Muse 开放地区
+REQUIRED_COUNTRY=
 PROXY_VENDOR=你的供应商名
 ```
 
@@ -321,8 +322,7 @@ panel.env            面板配置（已 gitignore）
 ## 相关链接
 
 - muse2api（上游）：<https://github.com/czg86389-hub/muse2api>
-- 静态住宅节点目录（IPDEEP）：<https://www.ipdeep.cn/static-residence>
-- 静态代理优惠页（IPDEEP）：<https://www.ipdeep.cn/static-proxy-deals>
+- 节点目录抓取源（本项目内置的目录工具读的就是它）：<https://www.ipdeep.cn/static-residence>
 - muse.ai：<https://muse.ai/>
 
 ## License

@@ -154,9 +154,9 @@ def main():
               bool(last.get("browser_ip")), "ip=%s" % last.get("browser_ip"))
         check("/api/guarantee names the target node",
               bool(last.get("node_ip")), "node=%s" % last.get("node_ip"))
-        links = g.get("ipdeep_links") or []
-        check("/api/guarantee exposes the IPDEEP links",
-              any("ipdeep" in (l.get("url") or "") for l in links),
+        links = g.get("vendor_links") or []
+        check("/api/guarantee exposes the vendor links",
+              bool(links) and all((l.get("url") or "").startswith("http") for l in links),
               "links=%d" % len(links))
 
     # ---- /api/login ------------------------------------------------------
